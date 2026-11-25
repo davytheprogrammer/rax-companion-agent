@@ -104,7 +104,7 @@ test('an Nvidia key can be pasted, tested and used from Home, without a restart'
   const host = read('src/main-companion.js');
   const store = read('companion/src/store.js');
   for (const id of ['key-nvidia-home', 'nvidia-state', 'data-test="nvidia"', 'data-clear="nvidia"']) assert.ok(html.includes(id), id);
-  assert.match(home, /\['typesafe','gemini','nvidia','anthropic'\]\)\$\('#key-'\+k\+'-home'\)\.value=''/);
+  assert.match(home, /\['typesafe','gemini','nvidia','anthropic','meta'\]\)\$\('#key-'\+k\+'-home'\)\.value=''/);
   assert.match(host, /nvidia: \(\) => s\.apiKeys\.nvidia \? timed\(ping\('nvidia'\)\)/);
   assert.match(store, /setSettings\(patch\) \{ load\(\); data = deepMerge\(data, patch \|\| \{\}\); pickKeyedProvider\(data\);/);
   assert.match(gs.plainKeyError('nvidia', '401 Unauthorized'), /starts with nvapi-/);

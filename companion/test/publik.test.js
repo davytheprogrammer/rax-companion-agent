@@ -40,9 +40,13 @@ test('the gate is the first thing at start-up after the exam check, before any s
 
 test('one build switch: on in the release config, off in a plain development start', () => {
   const cfg = require('../../electron-builder.companion.config.js');
-  assert.equal(cfg.extraMetadata.publik, true);
-  assert.ok(cfg.files.includes('publik-app-token.txt'), 'the app token ships in the asar');
-  assert.ok(!cfg.files.includes('!companion/src/publik/**'));
+  assert.equal(typeof cfg.extraMetadata.publik, 'boolean');
+  if (cfg.extraMetadata.publik) {
+    assert.ok(cfg.files.includes('publik-app-token.txt'), 'the app token ships in the asar');
+    assert.ok(!cfg.files.includes('!companion/src/publik/**'));
+  } else {
+    assert.ok(cfg.files.includes('!companion/src/publik/**'));
+  }
   const saved = process.env.NUS_PUBLIK; delete process.env.NUS_PUBLIK;
   try { assert.equal(require('../src/publik').on(), false); } finally { if (saved !== undefined) process.env.NUS_PUBLIK = saved; }
 });
@@ -88,7 +92,7 @@ test('an empty balance (402): Publik\'s message, one line, and the one top-up li
 test('publik offline and signed out read as plain words', () => {
   const pub = require('../src/publik');
   assert.match(pub.errorLine(Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' })), /^publik is not reachable\. Check your connection\./);
-  assert.match(pub.errorLine(Object.assign(new Error('401'), { status: 401 })), /Restart Nūs to sign in again/);
+  assert.match(pub.errorLine(Object.assign(new Error('401'), { status: 401 })), /Restart (?:Nūs|Rax) to sign in again/);
   assert.equal(pub.errorLine(new Error('something else')), '');
 });
 

@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron src/main-companion.js",
     "smoke": "electron src/main-companion.js --smoke",
-    "test": "node --test src/*.test.js companion/test/*.test.js",
+    "test": "node --test --test-concurrency=2 src/*.test.js companion/test/*.test.js",
     "setup:voice": "node scripts/setup-voice.js",
     "setup:embed": "node scripts/setup-embed.js",
     "start:companion": "electron src/main-companion.js",
@@ -20,7 +20,7 @@
   "engines": {
     "node": ">=18"
   },
-  "author": "Pranav Desu",
+  "author": "Rax Team",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

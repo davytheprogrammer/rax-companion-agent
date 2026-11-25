@@ -40,8 +40,11 @@
   // installed, downloading (with progress), or how big the one-time download is.
   function paintVoice(v) {
     const box = $('#own-voice'), note = $('#own-voice-note'), prog = $('#own-voice-progress');
+    const picker = $('#voice-select'), pickerRow = $('#voice-picker-row');
     if (!box) return;
     box.checked = v.voice !== 'system';
+    if (pickerRow) pickerRow.style.display = box.checked ? 'block' : 'none';
+    if (picker && v.voice && v.voice !== 'system') picker.value = v.voice;
     if (v.downloading) {
       const pct = v.downloading.total ? Math.round(100 * v.downloading.got / v.downloading.total) : 0;
       prog.hidden = false; prog.textContent = 'Downloading the voice… ' + pct + '% (' + Math.round(v.downloading.got / 1048576) + ' of ' + Math.round(v.downloading.total / 1048576) + ' MB)';
@@ -49,16 +52,26 @@
       return;
     }
     box.disabled = false; prog.hidden = true;
-    note.textContent = v.installed ? (v.ready ? 'Fable is loaded and speaking.' : 'Fable is installed. It loads the moment you press the talk key.') : 'Fable, a soft British voice that runs on this computer. One download of about ' + Math.round((v.modelBytes || 349906910) / 1048576) + ' MB the first time; nothing leaves your machine. Off, the Windows voice speaks.';
+    note.textContent = v.installed ? (v.ready ? (v.label || 'Natural voice') + ' is loaded and speaking.' : (v.label || 'Natural voice') + ' is ready on this computer.') : 'Natural neural voice running locally on this computer. Off, the Windows voice speaks.';
   }
   $('#own-voice').onchange = e => run(async () => {
     const on = e.target.checked;
     if (!on) { await api.settingsSet({ voice: 'system' }); paintVoice(await api.voiceStatus()); notice('Back to the Windows voice.'); return; }
-    let v = await api.voiceStatus();
-    if (!v.installed) { notice('Downloading Fable. The switch turns on by itself when it is in.'); v = await api.voiceInstall('fable'); }
-    if (v.installed) { await api.settingsSet({ voice: 'fable' }); notice('Fable is on.'); }
+    const picker = $('#voice-select');
+    const wantVoice = (picker && picker.value) ? picker.value : 'fable';
+    await api.settingsSet({ voice: wantVoice });
+    notice('Natural voice is on.');
     paintVoice(await api.voiceStatus());
   });
+  const voiceSelectEl = $('#voice-select');
+  if (voiceSelectEl) {
+    voiceSelectEl.onchange = e => run(async () => {
+      const picked = e.target.value;
+      await api.settingsSet({ voice: picked });
+      notice('Voice changed to ' + (voiceSelectEl.options[voiceSelectEl.selectedIndex].text) + '.');
+      paintVoice(await api.voiceStatus());
+    });
+  }
   api.on('home:voice', v => paintVoice(v));
   // The optional speech model row, the same shape as the voice row above.
   function paintSpeech(v) {
@@ -113,7 +126,7 @@
     $('#stats-intro').hidden = !st.firstRun;
     $('#send-stats-intro').checked = st.enabled !== false;
     $('#send-stats').checked = st.enabled !== false;
-    $('#stats-state').textContent = st.enabled === false ? 'Off. Nothing is sent.' : 'Which features get used, on a random install id. Never your coursework or what you type.';
+    $('#stats-state').textContent = st.enabled === false ? 'Off. Nothing is sent.' : 'Which features get used, on a random install id. Never your private files or what you type.';
   }
   // The optional account: the Settings card in one of three states, and the
   // one offer on Saved from the third day the Companion was opened.
@@ -231,7 +244,7 @@
   async function settings() {
     const [s,status,intents] = await Promise.all([api.settingsGet(),api.status(),api.intents()]);
     paintStatus(status);
-    for(const key of ['typesafe','gemini','nvidia','anthropic']) {
+    for(const key of ['typesafe','gemini','nvidia','anthropic','meta']) {
       const set=key==='typesafe' ? status.reflex.key : s.keys[key];
       $('#'+key+'-state').textContent=set ? 'Set'+(key==='typesafe'?' · '+status.reflex.keySource:'') : 'Not set';
       $('#'+key+'-state').classList.toggle('set',!!set);
@@ -250,6 +263,7 @@
     $('#ptt-input').placeholder=chord(status.ptt.accelerator);
     $('#open-mic').checked=!!s.openMic;
     $('#wake-word').checked=!!s.wakeWord;
+    if($('#hands-autonomous'))$('#hands-autonomous').checked=!!s.handsAutonomous;
     fillMics(s);
     $('#persist-transcripts-home').checked=s.persistTranscripts!==false;
     $('#save-audio-home').checked=!!s.saveAudio;
@@ -364,16 +378,16 @@
   $('#tutorial').onclick=()=>run(()=>api.control('tutorial'));
   $('#capture-toggle').onclick=e=>run(async()=>paintStatus(await api.control('capture')),e.currentTarget);
   $('#key-form').onsubmit=e=>{e.preventDefault();run(async()=>{
-    const keys={};for(const k of ['typesafe','gemini','nvidia','anthropic']){const input=$('#key-'+k+'-home');if(input.value.trim())keys[k]=input.value.trim();}
+    const keys={};for(const k of ['typesafe','gemini','nvidia','anthropic','meta']){const input=$('#key-'+k+'-home');if(input.value.trim()){keys[k]=input.value.trim();if(k==='meta')keys.muse=input.value.trim();}}
     if(Object.keys(keys).length)await api.settingsSet({apiKeys:keys});
-    for(const k of ['typesafe','gemini','nvidia','anthropic'])$('#key-'+k+'-home').value='';
+    for(const k of ['typesafe','gemini','nvidia','anthropic','meta'])$('#key-'+k+'-home').value='';
     await settings();notice(Object.keys(keys).length?'Keys saved. Checking them now.':'Nothing to save.');
     // A bad key is caught at entry, not on the next ask.
     for(const k of Object.keys(keys))await testKey(k);
   },e.submitter);};
-  $$('[data-clear]').forEach(b=>b.onclick=()=>run(async()=>{await api.settingsSet({apiKeys:{[b.dataset.clear]:''}});await settings();notice(b.dataset.clear==='typesafe'?'Saved TypeSafe key cleared. An environment key, if present, still takes priority.':'Saved key cleared.');},b));
+  $$('[data-clear]').forEach(b=>b.onclick=()=>run(async()=>{const p={[b.dataset.clear]:''};if(b.dataset.clear==='meta')p.muse='';await api.settingsSet({apiKeys:p});await settings();notice(b.dataset.clear==='typesafe'?'Saved TypeSafe key cleared. An environment key, if present, still takes priority.':'Saved key cleared.');},b));
   // Test buttons: one round trip per key, the result lands on that row's badge.
-  const testLabels={typesafe:'Voice',gemini:'Gemini',nvidia:'Nvidia',anthropic:'Anthropic',cli:'Claude Code'};
+  const testLabels={typesafe:'Voice',gemini:'Gemini',nvidia:'Nvidia',anthropic:'Anthropic',cli:'Claude Code',meta:'Meta Muse'};
   async function testKey(which){
     const badge=$('#'+(which==='cli'?'cli-state':which+'-state'));
     // The note sits directly under the row it is about.
@@ -411,7 +425,7 @@
   $('#feedback-form').onsubmit=e=>{e.preventDefault();const message=$('#feedback-message').value.trim();if(!message){feedbackNote('Write a line first.','error');$('#feedback-message').focus();return;}
     run(async()=>{feedbackNote('Sending...');const r=await api.feedbackSend({kind:feedbackKind,message,email:$('#feedback-email').value.trim()});
       $('#feedback-message').value='';
-      feedbackNote(r&&r.delivered?'Sent. Thank you. Pranav reads every note.':'Saved on this computer. It goes to Pranav as soon as Rax can reach him.','ok');},e.submitter);};
+      feedbackNote(r&&r.delivered?'Sent. Thank you. We read every note.':'Saved on this computer. It goes to support as soon as Rax is online.','ok');},e.submitter);};
   $('#ptt-form').onsubmit=e=>{e.preventDefault();run(async()=>{const r=await api.setPtt($('#ptt-input').value);if(!r.ok)throw new Error(r.error||'No talk key could be registered.');await settings();notice(r.fallback?'Requested key was unavailable. Live key: '+chord(r.accelerator):'Talk key updated.');},e.submitter);};
   // Settings, Voice, Microphone (companion/renderer/mic-devices.js, the same list the Knot reads).
   // Picking one saves it; the Knot's open mic moves to it. Test opens it for a few seconds and
@@ -461,7 +475,7 @@
     run(async()=>{const r=await api.publikSignOut();if(r&&r.ok)notice('Signed out of publik. Rax is restarting.');else{publikSignOutArmed(false);notice('Could not sign out of publik on this computer.',true);}},e.currentTarget);
   };
   $('#use-own-key').onchange=e=>run(async()=>{await api.publikChoice(e.target.checked?'own_key':'publik');await settings();notice(e.target.checked?'Saved. Your own key or Claude Code answers now.':'Saved. publik answers now.');},e.target);
-  const fields={'open-mic':['openMic',e=>e.checked],'wake-word':['wakeWord',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
+  const fields={'open-mic':['openMic',e=>e.checked],'wake-word':['wakeWord',e=>e.checked],'hands-autonomous':['handsAutonomous',e=>e.checked],'speak-replies-home':['speakReplies',e=>e.checked],'sounds':['sounds',e=>e.checked],'channel-messages':['channelMessages',e=>e.checked],'start-with-windows':['startWithWindows',e=>e.checked],'focus-guard':['focusGuard',e=>e.checked],'hands':['hands',e=>e.checked],'tasks':['tasks',e=>e.checked],'knot-island':['knotIsland',e=>e.checked],'focus-feeds':['focusGuardFeeds',e=>e.value.split(',').map(x=>x.trim()).filter(Boolean)],'hide-from-capture':['hideFromCapture',e=>e.checked],'persist-transcripts-home':['persistTranscripts',e=>e.checked],'save-audio-home':['saveAudio',e=>e.checked],'retention-days':['audioRetentionDays',e=>Number(e.value)],'knot-display':['knotDisplayId',e=>e.value?Number(e.value):null]};
   for(const [id,[key,value]] of Object.entries(fields))$('#'+id).onchange=e=>run(async()=>{await api.settingsSet({[key]:value(e.target)});notice('Saved.');},e.target);
   // Two switches, one setting: the first-run card and the Privacy card stay in step.
   for(const id of ['send-stats','send-stats-intro'])$('#'+id).onchange=e=>run(async()=>{await api.settingsSet({sendStats:e.target.checked});paintStatus(await api.status());notice(e.target.checked?'Anonymous usage stats on.':'Anonymous usage stats off. Nothing more is sent.');});
@@ -517,7 +531,7 @@
     openSettings:section=>run(async()=>{await setView('settings');if(section==='voice'){await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const box=$('#own-voice');if(box){box.closest('.card').scrollIntoView({block:'start'});box.focus({preventScroll:true});notice('Fable needs one download first. Turn on the Knot voice switch here.');}}}),
     onError:e=>notice(e.message||String(e),true)});
   // A switch flipped anywhere: the home row and the Settings page both follow.
-  function mirrorSettings(s){homeView.onSettings(s);if(view!=='settings')return;for(const [id,on] of [['open-mic',!!s.openMic],['wake-word',!!s.wakeWord],['sounds',s.sounds!==false],['channel-messages',s.channelMessages!==false],['start-with-windows',s.startWithWindows===true],['hands',s.hands===true],['tasks',s.tasks===true],['knot-island',s.knotIsland===true],['hide-from-capture',s.hideFromCapture!==false],['speak-replies-home',!!s.speakReplies]]){const box=$('#'+id);if(box&&box!==document.activeElement)box.checked=on;}}
+  function mirrorSettings(s){homeView.onSettings(s);if(view!=='settings')return;for(const [id,on] of [['open-mic',!!s.openMic],['wake-word',!!s.wakeWord],['hands-autonomous',!!s.handsAutonomous],['sounds',s.sounds!==false],['channel-messages',s.channelMessages!==false],['start-with-windows',s.startWithWindows===true],['hands',s.hands===true],['tasks',s.tasks===true],['knot-island',s.knotIsland===true],['hide-from-capture',s.hideFromCapture!==false],['speak-replies-home',!!s.speakReplies]]){const box=$('#'+id);if(box&&box!==document.activeElement)box.checked=on;}}
   api.on('home:settings',mirrorSettings);
   api.on('home:update',paintUpdate);
   api.on('home:tasks',p=>homeView.onTask(p));

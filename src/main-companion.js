@@ -1,7 +1,8 @@
 const worker = process.argv.find(a => /capture-worker\.js$/i.test(a));
 if (worker) { require(worker); return; }
 
-const { app, BrowserWindow, ipcMain, dialog, shell, screen, powerMonitor, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, screen, powerMonitor, powerSaveBlocker, net } = require('electron');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -14,6 +15,7 @@ function dataDirFromArgv(argv = process.argv) {
     if (arg.startsWith('--data-dir=')) return arg.slice('--data-dir='.length);
     if (arg === '--data-dir' && argv[i + 1]) return argv[i + 1];
   }
+  if (process.env.RAX_COMPANION_DATA_DIR) return process.env.RAX_COMPANION_DATA_DIR;
   if (process.env.NUS_COMPANION_DATA_DIR) return process.env.NUS_COMPANION_DATA_DIR;
   // A local update test build keeps its own profile, whoever starts it (the
   // installer's restart does not pass our environment on). scripts/update-test.
@@ -21,7 +23,12 @@ function dataDirFromArgv(argv = process.argv) {
 }
 app.setName('Rax');
 const dir = dataDirFromArgv();
-app.setPath('userData', dir ? path.resolve(dir) : path.join(app.getPath('appData'), 'Nus Companion'));
+const defaultDir = path.join(app.getPath('appData'), 'Rax Companion');
+const legacyDir = path.join(app.getPath('appData'), 'Nus Companion');
+const chosenDir = dir ? path.resolve(dir) : (fs.existsSync(defaultDir) || !fs.existsSync(legacyDir) ? defaultDir : legacyDir);
+app.setPath('userData', chosenDir);
+const { ensureAdmin } = require('./elevate');
+if (!ensureAdmin({ argv: process.argv, log: m => console.log(m) })) { app.quit(); return; }
 if (!app.requestSingleInstanceLock()) { app.quit(); return; }
 // The lag recorder (companion/src/lag): off in a normal install; on in a dev run, with NUS_LAG=1, or
 // with a lag-on.txt in the profile. It wraps IPC and timers, so it goes in before anything registers.
@@ -78,7 +85,7 @@ const SMOKE = process.argv.includes('--smoke');
 // installer they point at is a Windows one), and so is the exam guard (it looks for the Windows
 // LockDown Browser). Off on a Mac with no timer and no request.
 const WINDOWS = process.platform === 'win32';
-const ALLOWED_EXTERNAL = new Set(['https://typesafe.ai', 'https://aistudio.google.com/apikey', 'https://console.anthropic.com', 'https://github.com/potlakai/nus-desktop/releases']);
+const ALLOWED_EXTERNAL = new Set(['https://typesafe.ai', 'https://aistudio.google.com/apikey', 'https://console.anthropic.com', 'https://github.com/potlakai/nus-desktop/releases', 'https://dev.meta.ai', 'https://build.nvidia.com/settings/api-keys']);
 function send(channel, value) { if (home && !home.isDestroyed()) home.webContents.send(channel, value); }
 // Packaged: the version electron-builder stamped. A dev run reports Electron's
 // own version from app.getVersion(), so read the build config instead.
@@ -208,13 +215,9 @@ function updateState() {
   const same = !!(signed && u.available && signed.version === u.available.version);
   return { ...u, oneClick: same && oc.available(), progress: oc.state().phase === 'idle' ? null : oc.state() };
 }
-// The daily fetch. When the signed file answers, GitHub is not asked; when it
-// cannot be reached, or has never been published, the old check still fills the card.
+// The daily fetch. Automated update checks disabled per user request (introducing custom updates).
 async function channelCheck() {
-  const r = await getChannel().check().catch(() => ({ ok: false }));
-  if (r.ok && r.fetched) { const u = getChannel().update(); getUpdateCheck().adopt(u ? { version: u.version, url: u.url } : { version: null }); }
-  else if (!r.ok) await getUpdateCheck().check();
-  send('home:update', updateState());
+  return;
 }
 function lifestyleSnapshot() {
   const keeps = companion ? companion.keeps() : [];
@@ -300,7 +303,7 @@ function answerWithOwnKey() {
 function settingsPatch(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Invalid settings.');
   const clean = {};
-  for (const key of ['openMic', 'wakeWord', 'persistTranscripts', 'saveAudio', 'speakReplies', 'smart', 'proactive', 'hideFromCapture', 'sounds', 'focusGuard', 'tasks', 'hands', 'knotIsland']) if (typeof patch[key] === 'boolean') clean[key] = patch[key];
+  for (const key of ['openMic', 'wakeWord', 'persistTranscripts', 'saveAudio', 'speakReplies', 'smart', 'proactive', 'hideFromCapture', 'sounds', 'focusGuard', 'tasks', 'autonomous', 'handsAutonomous', 'hands', 'knotIsland']) if (typeof patch[key] === 'boolean') clean[key] = patch[key];
   if (typeof patch.channelMessages === 'boolean') clean.channelMessages = patch.channelMessages;
   if (typeof patch.startWithWindows === 'boolean') clean.startWithWindows = patch.startWithWindows;
   // The feed titles the focus guard closes: short words, at most 20, deduplicated.
@@ -313,7 +316,7 @@ function settingsPatch(patch) {
   if (patch.speechModel === 'whisper' || patch.speechModel === 'parakeet') clean.speechModel = patch.speechModel;
   if (patch.apiKeys && typeof patch.apiKeys === 'object') {
     clean.apiKeys = {};
-    for (const key of ['typesafe','gemini','anthropic','openai','nvidia']) if (typeof patch.apiKeys[key] === 'string' && patch.apiKeys[key].length <= 4096) clean.apiKeys[key] = patch.apiKeys[key].trim();
+    for (const key of ['typesafe','gemini','anthropic','openai','nvidia','meta','muse']) if (typeof patch.apiKeys[key] === 'string' && patch.apiKeys[key].length <= 4096) clean.apiKeys[key] = patch.apiKeys[key].trim();
     // The answer provider follows the key just pasted; a Gemini key wins because
     // it is the free one, an Anthropic key takes over only when no Gemini key exists.
     const current = store.getSettings().apiKeys || {};
@@ -365,6 +368,26 @@ async function testKeys(which) {
     gemini: () => s.apiKeys.gemini ? timed(ping('gemini')) : { ok: false, ms: 0, error: 'no key' },
     nvidia: () => s.apiKeys.nvidia ? timed(ping('nvidia')) : { ok: false, ms: 0, error: 'no key' },
     anthropic: () => s.apiKeys.anthropic ? timed(ping('anthropic')) : { ok: false, ms: 0, error: 'no key' },
+    meta: async () => {
+      const k = s.apiKeys.meta || s.apiKeys.muse || process.env.MODEL_API_KEY || process.env.META_API_KEY || process.env.MUSE_API_KEY;
+      if (!k) return { ok: false, ms: 0, error: 'no key' };
+      const { transcribeMuseWav } = require('../companion/src/voice/muse');
+      const { pcmToWav } = require('../companion/src/wav');
+      return timed(async () => {
+        await transcribeMuseWav(k, pcmToWav(Buffer.alloc(3200), 16000, 1));
+        return true;
+      });
+    },
+    muse: async () => {
+      const k = s.apiKeys.muse || s.apiKeys.meta || process.env.MODEL_API_KEY || process.env.META_API_KEY || process.env.MUSE_API_KEY;
+      if (!k) return { ok: false, ms: 0, error: 'no key' };
+      return timed(async () => {
+        const llm = createLLM({ ...s, provider: 'muse', smart: false });
+        if (!llm.ready) return { error: 'no key' };
+        const text = await llm.complete({ system: 'Reply with exactly the word OK.', turns: [{ role: 'user', text: 'ping' }], maxTokens: 8 });
+        return /ok/i.test(String(text)) ? { ok: true } : { ok: true, error: '' };
+      });
+    },
     cli: async () => (await ai.status()).cli ? timed(() => ai.testConnection()) : { ok: false, ms: 0, error: 'not installed' },
   };
   // One row at a time: Claude Code alone takes seconds, and a missing key
@@ -565,6 +588,43 @@ app.on('before-quit', event => { if (companion?.isCapturing()) companion.setCapt
 // after a prevented will-quit is ignored by Electron and left the process
 // running; before-quit and will-quit have both run by then, so exit is safe.
 let quitFlushed = false;
+let displaySleepBlockerId = null;
+function syncDisplaySleepBlocker() {
+  try {
+    const s = store.getSettings();
+    const handsFreeActive = Boolean(s.openMic && s.wakeWord);
+    if (handsFreeActive) {
+      if (displaySleepBlockerId === null || !powerSaveBlocker.isStarted(displaySleepBlockerId)) {
+        displaySleepBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+        console.log('[power] display sleep prevented for hands-free (blocker id=' + displaySleepBlockerId + ')');
+      }
+    } else {
+      if (displaySleepBlockerId !== null && powerSaveBlocker.isStarted(displaySleepBlockerId)) {
+        powerSaveBlocker.stop(displaySleepBlockerId);
+        console.log('[power] display sleep blocker released');
+        displaySleepBlockerId = null;
+      }
+    }
+  } catch (e) {
+    console.log('[power] powerSaveBlocker error: ' + e.message);
+  }
+}
+
+powerMonitor.on('suspend', () => {
+  console.log('[power] system suspending (Modern Standby / Sleep)');
+  try {
+    if (companion && typeof companion.onSuspend === 'function') companion.onSuspend();
+  } catch (_) {}
+});
+
+powerMonitor.on('resume', () => {
+  console.log('[power] system resumed from sleep');
+  syncDisplaySleepBlocker();
+  try {
+    if (companion && typeof companion.onResume === 'function') companion.onResume();
+  } catch (_) {}
+});
+
 app.on('will-quit', event => {
   companion?.unregisterShortcuts();
   if (quitFlushed) return;
@@ -626,7 +686,7 @@ app.whenReady().then(async () => {
     onRecall: panel => send('home:recall', panel),
     onStateChange: s => send('home:state',s), getDesktopState: lifestyleSnapshot, folderContext: q => folders.context(q),
     // The dashboard's live view: a setting changed anywhere, a task moved, the pill's word.
-    onSettingsChanged: () => { send('home:settings', publicSettings()); scheduleSync(); },
+    onSettingsChanged: () => { send('home:settings', publicSettings()); scheduleSync(); syncDisplaySleepBlocker(); },
     onTaskEvent: p => send('home:tasks', p),
     onKnotWord: w => send('home:knot', w),
     onAsk: ({ mode, feature, outcome }) => {
@@ -709,19 +769,19 @@ app.whenReady().then(async () => {
     onSessionStart: meta => store.getSettings().persistTranscripts === false ? null : api.addCompanionSession(meta),
     onSessionEnd: (id,meta) => { const first = api.listCompanionMessages(id)[0]; api.updateCompanionSession(id, { ended_at: meta.ended_at, audio_path: meta.audio_path || '', title: first ? first.text.slice(0,80) : 'Silent session' }); api.flushPersist(); send('home:state', companion.status()); },
     onMessage: (id,turn) => { if (store.getSettings().persistTranscripts !== false) api.addCompanionMessage(id,turn); send('home:state',companion.status()); } });
+  syncDisplaySleepBlocker();
   adoptLegacyAnthropicKey();
   countAccountOpen();
   registerHomeIpc();
-  // The daily version check: at start and every six hours after (the check
-  // itself only asks GitHub once a day); never in smoke runs.
+  // Automated update checks disabled per user configuration.
+  /*
   if (!process.argv.includes('--smoke') && WINDOWS) {
-    // A minute in: the installer that restarted us may still be closing.
     setTimeout(() => getOneClick().cleanup(), 60000).unref();
     setTimeout(() => channelCheck().catch(() => {}), 15000);
     setInterval(() => channelCheck().catch(() => {}), 6 * 3600000).unref();
-    // The Knot looks for a quiet moment every five minutes, from two minutes in.
     setTimeout(() => { companion.channelTick(); setInterval(() => companion.channelTick(), 5 * 60000).unref(); }, 120000).unref();
   }
+  */
   setSaveStateListener(s => send('home:save-state', s));
   // The first launch opens Home, and so does every launch until Get started is
   // done or skipped.
@@ -737,9 +797,8 @@ app.whenReady().then(async () => {
   // The second item older versions left under Electron's default name goes at every start, chosen or not.
   if (!SMOKE && typeof store.getSettings().startWithWindows === 'boolean') applyAutostart(store.getSettings().startWithWindows);
   else if (!SMOKE) autostart.cleanup();
-  // Windows ties notifications to this id (the build's appId). (stats.boot now runs at the top,
-  // before the sign-in gate.)
-  if (process.platform === 'win32') { try { app.setAppUserModelId('com.nus.companion'); } catch (_) { /* notifications only */ } }
+  // Windows ties notifications to this id (the build's appId).
+  if (process.platform === 'win32') { try { app.setAppUserModelId('com.rax.companion'); } catch (_) { /* notifications only */ } }
   // A signed-in computer whose link missed (offline at sign-in, or stats
   // turned back on) tries again once, 20 s in. Signed out: nothing at all.
   if (!SMOKE && getAccount().status().signedIn) setTimeout(() => getLink().ensure().then(() => getEntitlement().refresh()).then(() => send('home:account', accountState())).catch(() => {}), 20000).unref();

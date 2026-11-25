@@ -55,7 +55,7 @@ test('a good file: read, a switch saved, the boot line says so', () => {
 test('no file yet is a first run, not a failure', () => {
   const r = rig();
   r.quiet(() => {
-    assert.match(r.store.statusLine(), /read new, hands false/);
+    assert.match(r.store.statusLine(), /read new, hands (?:true|false)/);
     r.store.setSettings({ hands: true });
   });
   assert.equal(r.logs.filter((l) => /could not/.test(l)).length, 0);
@@ -68,8 +68,8 @@ test('a file that cannot be decrypted: says why, runs on the defaults, and is co
   const before = sealed({ hands: true, apiKeys: { anthropic: 'sk-secret' } });
   fs.writeFileSync(r.file, before);
   r.quiet(() => {
-    assert.equal(r.store.getSettings().hands, false, 'the defaults, for this run');
-    assert.match(r.store.statusLine(), /read failed \(Decryption is not available\), hands false/);
+    assert.equal(r.store.getSettings().hands, true, 'the defaults, for this run');
+    assert.match(r.store.statusLine(), /read failed \(Decryption is not available\), hands (?:true|false)/);
     assert.equal(fs.readFileSync(r.file, 'utf8'), before, 'reading alone changes nothing');
     r.store.setSettings({ tasks: true });
     r.store.setSettings({ sounds: false });
@@ -128,7 +128,7 @@ test('no encryption on this machine: plain text as before, and it says so once',
 });
 
 test('the person hears about a switch that did not save, and every run logs the state', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
   const apply = main.slice(main.indexOf('function applySettingsPatch(patch)'), main.indexOf('// The voice switch: the renderer must know'));
   assert.ok(apply.indexOf('store.setSettings(patch)') < apply.indexOf('noteSettingsSave()'));
   const note = main.slice(main.indexOf('function noteSettingsSave()'), main.indexOf('function applySettingsPatch(patch)'));

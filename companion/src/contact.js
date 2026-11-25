@@ -32,18 +32,18 @@ const EMAIL_MAX = 200;
 
 // Every word the person sees. One place, so the ruling can change them.
 const WORDS = {
-  kicker: 'from Pranav',
-  bubble: 'Want a heads-up when something new ships? Leave your email and Pranav writes to you when there is news. Nothing else, and no account.',
+  kicker: 'from Rax',
+  bubble: 'Want a heads-up when something new ships? Leave your email to receive product updates and new feature releases. Nothing else, and no account.',
   yes: 'Leave my email',
   no: 'No thanks',
   placeholder: 'Your email, then Enter',
   saved: 'Saved. One email when there is news, nothing else.',
-  savedLater: 'Saved. It goes to Pranav as soon as Rax can reach him.',
+  savedLater: 'Saved. It goes to support as soon as Rax is online.',
   bad: 'That email does not look right. Try once more.',
   cardTitle: 'Want a heads-up when something new ships?',
   cardBody: LINK_INSTALL
-    ? 'Leave your email and Pranav writes to you when there is news. Nothing else, and no account. It is kept with this computer\'s install id so he can see which version you are on. Ask any time and it is deleted.'
-    : 'Leave your email and Pranav writes to you when there is news. Nothing else, and no account. It is kept apart from your usage stats. Ask any time and it is deleted.',
+    ? 'Leave your email to receive updates when new features ship. Nothing else, and no account. It is kept with this computer\'s install id so we can see which version you are on. Ask any time and it is deleted.'
+    : 'Leave your email to receive updates when new features ship. Nothing else, and no account. It is kept apart from your usage stats. Ask any time and it is deleted.',
   cardButton: 'Keep me posted',
   cardPlaceholder: 'Your email',
 };

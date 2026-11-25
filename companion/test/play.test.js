@@ -256,7 +256,7 @@ test('the sound: a no-op without audio, and it never throws', () => {
 });
 
 test('one game, started on purpose: the menu row, the tray item, and a task always wins', () => {
-  const read = (rel) => fs.readFileSync(path.join(__dirname, rel), 'utf8');
+  const read = (rel) => fs.readFileSync(path.join(__dirname, rel), 'utf8').replace(/\r\n/g, '\n');
   const menu = read('../renderer/knot-menu.js');
   assert.match(menu, /canPlay && canPlay\(\)/);
   assert.match(menu, /'Shoot hoops'/);

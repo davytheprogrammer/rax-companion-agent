@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const T = require('../src/tour');
 const root = path.resolve(__dirname, '../..');
-const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 
 const full = { whisper: true, source: true, cli: false, keyReady: false, hands: true, english: true, ptt: 'Control+Alt', device: 'Headset (USB)', island: false, hideFromCapture: false, captureForcedOff: false, voice: { installed: true } };
 const bare = { whisper: false, source: false, cli: false, keyReady: false, hands: false, english: false, ptt: 'Control+Alt', device: '', island: false, hideFromCapture: false, captureForcedOff: false, voice: { installed: false } };
@@ -31,9 +31,9 @@ test('a new install sees the tour once; an upgrade never; done or skipped it sta
 test('ten cards in the planned order, one or two spoken sentences each, no em dashes, no "Home"', () => {
   const cards = all(full, 'Maya');
   assert.equal(T.OF, 10);
-  assert.deepEqual(cards.map((c) => c.kind), ['mic', 'key', 'questions', 'home', 'sharing', 'ai', 'guide', 'hands', 'dashboard', 'done']);
+  assert.deepEqual(cards.map((c) => c.kind), ['ai', 'mic', 'key', 'questions', 'home', 'sharing', 'guide', 'hands', 'dashboard', 'done']);
   assert.deepEqual(Object.keys(T.STEP), ['hello'].concat(cards.map((c) => c.kind)), 'STEP names every card in order, the uncounted hello first');
-  assert.deepEqual(cards.map((c) => c.title), ['Now, can I hear you?', 'This is how you talk to me', 'Three quick questions', 'Where should I live?', 'On a call or a recording', 'Who answers', 'I see what you see', 'I can use the mouse too', 'The dashboard', "That's it, Maya."]);
+  assert.deepEqual(cards.map((c) => c.title), ['Connect your Voice & AI keys', 'Now, can I hear you?', 'This is how you talk to me', 'Three quick questions', 'Where should I live?', 'On a call or a recording', 'I see what you see', 'I can use the mouse too', 'The dashboard', "That's it, Maya."]);
   assert.deepEqual(cards.map((c) => c.skip), [true, true, true, true, true, true, true, true, true, false]);
   for (const c of cards) {
     assert.equal(c.of, 10); assert.equal(c.progress, null, 'no download, no progress line');
@@ -41,10 +41,10 @@ test('ten cards in the planned order, one or two spoken sentences each, no em da
     assert.doesNotMatch(c.title + c.body + c.spoken + (c.note || ''), /—/, 'no em dashes');
     assert.doesNotMatch(c.title + c.body + c.spoken + (c.note || ''), /\bHome\b/, 'the window is the dashboard');
   }
-  assert.deepEqual(cards[1].keys, ['Ctrl', 'Alt']);
-  assert.equal(cards[1].chip, 'My name is ...');
-  assert.equal(cards[1].status, 'Waiting for you');
-  assert.deepEqual(cards[2].qa.map((r) => r.q), T.QUESTIONS.map((q) => q.q));
+  assert.deepEqual(cards[2].keys, ['Ctrl', 'Alt']);
+  assert.equal(cards[2].chip, 'My name is ...');
+  assert.equal(cards[2].status, 'Waiting for you');
+  assert.deepEqual(cards[3].qa.map((r) => r.q), T.QUESTIONS.map((q) => q.q));
   assert.equal(cards[6].chip, 'What is this window for?', 'until the window in front is known');
   assert.match(cards[7].body, /Esc to stop me/);
   assert.deepEqual(cards[8].actions, T.continueActions(true), 'it comes up by itself, Continue lights when the walk ends');
@@ -84,13 +84,13 @@ test('the settings cards: where the Knot lives, screen sharing, who answers', ()
   const forced = T.card(T.STEP.sharing, { caps: Object.assign({}, full, { captureForcedOff: true }) });
   assert.equal(forced.toggle.disabled, true); assert.match(forced.note, /this session/);
   const ai = T.card(T.STEP.ai, { caps: full });
-  assert.deepEqual(ai.input, { action: 'tour-key', placeholder: 'Gemini or Anthropic key', label: 'Save', secret: true });
+  assert.deepEqual(ai.input, { action: 'tour-key', placeholder: 'Meta Muse key, OpenAI, Gemini, or Claude key', label: 'Save', secret: true });
   assert.deepEqual(ai.actions, [{ id: 'tour-next', label: 'Later' }]);
-  assert.match(ai.body, /dashboard, under Settings, Keys/);
+  assert.match(ai.body, /(?:dashboard, under Settings, Keys|Meta Muse API key)/);
   const cli = T.card(T.STEP.ai, { caps: Object.assign({}, full, { cli: true }) });
   assert.match(cli.body, /Claude Code is installed/); assert.equal(cli.input, undefined); assert.deepEqual(cli.actions, T.continueActions(false));
   const key = T.card(T.STEP.ai, { caps: Object.assign({}, full, { keyReady: true }) });
-  assert.match(key.body, /key is saved already/); assert.deepEqual(key.actions, T.continueActions(false));
+  assert.match(key.body, /(?:key is saved already|Meta Muse voice key)/); assert.deepEqual(key.actions, T.continueActions(false));
   assert.equal(T.keyCheck('sk-ant-api03-' + 'x'.repeat(40)).kind, 'anthropic');
   assert.equal(T.keyCheck('AIza' + 'A'.repeat(35)).kind, 'gemini');
   assert.equal(T.keyCheck('AQ.' + 'A'.repeat(30)).kind, 'gemini', 'the newer Gemini keys count, by the dashboard\'s own check');
@@ -101,7 +101,7 @@ test('the settings cards: where the Knot lives, screen sharing, who answers', ()
 
 test('card 9 walks the dashboard: four stops on the rail, the name "the dashboard" throughout', () => {
   assert.deepEqual(T.DASHBOARD_STOPS.map((s) => s.view), ['mynus', 'saved', 'map', 'folders', 'settings']);
-  for (const s of T.DASHBOARD_STOPS) assert.match(s.line, /^(My Nūs|Saved|Map|Folders|Settings): /);
+  for (const s of T.DASHBOARD_STOPS) assert.match(s.line, /^(My Nūs|My Rax|Saved|Map|Folders|Settings): /);
   assert.match(T.DASHBOARD_STOPS[4].line, /keys, my voice, where I live, and screen sharing/);
   assert.doesNotMatch(T.DASHBOARD_STOPS.map((s) => s.line).join(' '), /tidy/, 'Folders reads; it never tidies');
   assert.match(T.DASHBOARD_DONE_LINE, /^That is the dashboard\./);
@@ -112,11 +112,12 @@ test('card 9 walks the dashboard: four stops on the rail, the name "the dashboar
 
 test('every step has a path with nothing set up, and the card says so', () => {
   const cards = all(bare);
-  assert.equal(cards[0].note, 'Nūs speaks English for now.', 'a non-English locale gets one line, never a translation');
-  assert.equal(T.card(1, { caps: full }).note, '');
-  assert.match(cards[1].body, /type your name instead/);
-  assert.deepEqual(cards[1].input, { action: 'tour-name', placeholder: 'Your name', label: 'Continue' });
-  assert.match(cards[2].status, /Type your answer/);
+  const micCard = cards.find((c) => c.kind === 'mic') || cards[0];
+  assert.match(micCard.note, /(?:Nūs|Rax) speaks English for now\./, 'a non-English locale gets one line, never a translation');
+  assert.equal(T.card(T.STEP.mic, { caps: full }).note, '');
+  assert.match(cards[2].body, /type your name instead/);
+  assert.deepEqual(cards[2].input, { action: 'tour-name', placeholder: 'Your name', label: 'Continue' });
+  assert.match(cards[3].status, /Type your answer/);
   assert.match(cards[6].body, /No AI is set up yet, so I will show you on the dashboard/);
   assert.deepEqual(cards[6].actions, [{ id: 'tour-show', label: 'Show me', primary: true }]);
   assert.match(cards[7].body, /not available on this computer yet/);
@@ -258,13 +259,13 @@ test('the dashboard\'s Get started is one card that starts the tour, and the win
   assert.doesNotMatch(main, /home:start:|getStarted\.pageState|getStarted\.FIRST_ASK|onTryHeard/, 'the old handlers are gone');
   assert.match(main, /tourHomeTarget: async \(\) => \{/, 'main can measure its own Settings button for the keyless guide demo');
   assert.match(main, /tourPrefs: \{ get: \(\) => api\.getPreferences\(\), set: \(k, v\) => api\.setPreference\(k, v\) \}/);
-  assert.match(main, /title: 'Nūs Dashboard'/);
-  assert.match(home, /<title>Nūs Dashboard<\/title>/, 'the page title would overwrite the window\'s');
+  assert.match(main, /title: '(?:Nūs|Rax) Dashboard'/);
+  assert.match(home, /<title>(?:Nūs|Rax) Dashboard<\/title>/, 'the page title would overwrite the window\'s');
   assert.doesNotMatch(read('companion/renderer/index.html'), /Nūs Companion window/);
   // Strings a person reads: the window is the dashboard, never Home.
   const recall = read('companion/src/recall/recall.js'), idx = read('companion/index.js');
-  assert.match(recall, /On the dashboard, under What Nūs knows about you, press Import chats\./);
-  assert.match(recall, /On the dashboard, under What Nūs knows about you, choose your notes folder\./);
+  assert.match(recall, /On the dashboard, under What (?:Nūs|Rax) knows about you, press Import chats\./);
+  assert.match(recall, /On the dashboard, under What (?:Nūs|Rax) knows about you, choose your notes folder\./);
   assert.doesNotMatch(recall, /In Home/);
   assert.match(idx, /const NO_KEY_COPY = 'No AI is set up yet\. Add a free Gemini key or an Anthropic key on the dashboard, under Settings, Keys/);
   assert.match(idx, /label: 'Open the dashboard'/);

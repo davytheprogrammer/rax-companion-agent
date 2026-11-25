@@ -28,7 +28,13 @@ const MODELS = {
   // not offered and its new hash is unverified.
   'kokoro-int8-v1_0': { url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2', sha256: '4c3052abaa60943a341f193888cf6abd68787dae6ab8ae5c925a706caa247e4e', folder: 'kokoro-int8-multi-lang-v1_0', bytes: 132303094 },
 };
-const VOICES = { fable: { model: 'kokoro-v1_0', speaker: 25, label: 'Fable', speed: 1.0 } };
+const VOICES = {
+  fable: { model: 'kokoro-v1_0', speaker: 25, label: 'Fable (British Male - Soft)', speed: 1.0 },
+  heart: { model: 'kokoro-v1_0', speaker: 3, label: 'Heart (American Female - Expressive)', speed: 1.0 },
+  adam: { model: 'kokoro-v1_0', speaker: 11, label: 'Adam (American Male - Deep)', speed: 1.0 },
+  emma: { model: 'kokoro-v1_0', speaker: 21, label: 'Emma (British Female - Crisp)', speed: 1.0 },
+  bella: { model: 'kokoro-v1_0', speaker: 2, label: 'Bella (American Female - Warm)', speed: 1.0 },
+};
 const DEFAULT_VOICE = 'fable';
 // The worker goes away after 30 quiet minutes (the model is ~300 MB in
 // memory). At five, the first line after a short break paid the reload.
@@ -155,10 +161,15 @@ function createVoice({ userData, settings, log = () => {}, spawnFn = spawn, exec
     return status();
   }
 
+  let currentLoadedSpeaker = null;
   function ensureWorker() {
     const v = wanted();
     if (!v || !installed(v)) return null;
+    if (worker && currentLoadedSpeaker !== null && currentLoadedSpeaker !== v.speaker) {
+      close();
+    }
     if (worker) return loading || Promise.resolve(worker);
+    currentLoadedSpeaker = v.speaker;
     const env = { ...process.env, ELECTRON_RUN_AS_NODE: '1' };
     const w = spawnFn(executable, [path.join(__dirname, 'engine-worker.js')], { env, windowsHide: true, stdio: ['ignore', 'ignore', 'ignore', 'ipc'], serialization: 'advanced' });
     worker = w; ready = null;
@@ -208,7 +219,7 @@ function createVoice({ userData, settings, log = () => {}, spawnFn = spawn, exec
     if (worker) { try { worker.send({ type: 'stop' }); } catch (_) { /* gone */ } }
   }
 
-  function close() { stop(); clearTimeout(idleTimer); if (worker) { try { worker.kill(); } catch (_) { /* gone */ } worker = null; ready = null; loading = null; } }
+  function close() { stop(); clearTimeout(idleTimer); currentLoadedSpeaker = null; if (worker) { try { worker.kill(); } catch (_) { /* gone */ } worker = null; ready = null; loading = null; } }
 
   // One instance is made before the sign-in window (to load Fable while the person signs in) and
   // handed to the companion, which sets its own listener here.

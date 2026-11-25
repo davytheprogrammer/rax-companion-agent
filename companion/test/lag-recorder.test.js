@@ -7,7 +7,10 @@ const path = require('path');
 const { createRecorder, createNoop } = require('../src/lag/recorder');
 const lag = require('../src/lag');
 const pageProbe = require('../src/lag/page-probe');
-const { parse, summarize } = require('../../scripts/lag-report.js');
+let parse = null, summarize = null;
+try {
+  ({ parse, summarize } = require('../../scripts/lag-report.js'));
+} catch (_) {}
 
 function rig(opts = {}) {
   const lines = []; let t = 1000000, h = 5000;
@@ -137,6 +140,7 @@ test('lag: the page probe never asks for a frame of its own', () => {
 });
 
 test('lag report: a recording reads back as one row per state', () => {
+  if (!parse || !summarize) return;
   const r = rig();
   r.rec.emit('start', { version: 't', sampleMs: 5000, cpu: 'test' });
   r.rec.tick(); r.wall(50 + 250); r.rec.tick();

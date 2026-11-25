@@ -264,11 +264,17 @@ function createLLM(settings) {
   // Opt-in because it spends API credits; the key is never written to settings.
   const envClaude = process.env.NUS_COMPANION_CLAUDE_API === '1' && !!process.env.ANTHROPIC_API_KEY;
   if (!envClaude && publik && publik.active()) return publikLLM()(settings);
-  const provider = envClaude ? 'anthropic' : settings.provider;
+  const provider = envClaude ? 'anthropic' : (settings.provider || 'muse');
   const keys = settings.apiKeys || {};
-  const apiKey = envClaude ? process.env.ANTHROPIC_API_KEY : keys[provider];
+  let apiKey = envClaude ? process.env.ANTHROPIC_API_KEY : keys[provider];
+  if ((provider === 'muse' || provider === 'meta') && !apiKey) {
+    apiKey = keys.muse || keys.meta || process.env.MODEL_API_KEY || process.env.META_API_KEY || process.env.MUSE_API_KEY || '';
+  }
   const tier = settings.smart ? 'smart' : 'fast';
-  const model = envClaude ? (process.env.NUS_COMPANION_CLAUDE_MODEL || 'claude-sonnet-5') : (settings.models[provider] || {})[tier];
+  let model = envClaude ? (process.env.NUS_COMPANION_CLAUDE_MODEL || 'claude-sonnet-5') : ((settings.models && settings.models[provider]) || {})[tier];
+  if ((provider === 'muse' || provider === 'meta') && !model) {
+    model = 'muse-spark-1.3-contributor';
+  }
 
   // Set to 4096 (effectively unlimited for a single response)
   // since some SDKs like Anthropic require a maxTokens value.
@@ -282,6 +288,10 @@ function createLLM(settings) {
     async stream(params) {
       if (DEBUG) console.log('[DEBUG LLM] stream() invoked for provider:', provider);
       const args = { apiKey, model, maxTokens, ...paramsWithComputer(params) };
+      if (provider === 'muse' || provider === 'meta') {
+        const baseURL = process.env.MUSE_API_BASE_URL || process.env.META_API_BASE_URL || 'https://api.meta.ai/v1';
+        return streamOpenAI({ ...args, baseURL, model: model || 'muse-spark-1.3-contributor' });
+      }
       if (provider === 'openai') return streamOpenAI(args);
       if (provider === 'nvidia') return streamOpenAI({ ...args, baseURL: 'https://integrate.api.nvidia.com/v1' });
       if (provider === 'anthropic') return streamAnthropic(args);
@@ -293,6 +303,10 @@ function createLLM(settings) {
       // walkthrough wants the smart tier). Unset leaves the configured one.
       // params.onDelta: streamed text for callers that can use it as it arrives.
       const args = { apiKey, maxTokens: params.maxTokens || 512, ...paramsWithComputer(params), model: params.model || model, onToken: params.onToken || params.onDelta || (() => {}) };
+      if (provider === 'muse' || provider === 'meta') {
+        const baseURL = process.env.MUSE_API_BASE_URL || process.env.META_API_BASE_URL || 'https://api.meta.ai/v1';
+        return streamOpenAI({ ...args, baseURL, model: params.model || model || 'muse-spark-1.3-contributor' });
+      }
       if (provider === 'gemini') return geminiComplete(args);
       // The other SDKs stream fine; collect and return.
       if (provider === 'openai') return streamOpenAI(args);

@@ -67,12 +67,21 @@ function plainKeyError(provider, raw) {
     if (/\b401\b|\b403\b|unauthor|forbidden|invalid/i.test(text)) return 'TypeSafe did not accept this key. Copy it again from typesafe.ai.';
     return 'The voice commands key did not work. Copy it again from typesafe.ai.';
   }
+  if (provider === 'meta' || provider === 'muse') {
+    if (/no key/i.test(text)) return 'Paste a Meta Model API key first.';
+    if (net.test(text)) return 'Rax could not reach Meta Model API. Check your internet, then press Test again.';
+    if (/\b401\b|\b403\b|unauthor|forbidden|invalid/i.test(text)) return 'Meta did not accept this key. Copy it again from dev.meta.ai.';
+    if (/\b429\b|rate limit/i.test(text)) return 'Meta Model API hit a rate limit. Try again in a minute.';
+    return 'That key did not work. Copy it again from dev.meta.ai.';
+  }
   return 'That did not work. Try again.';
 }
 
 // Which answer source is ready, in the order the Knot uses them: its own key
 // first, then Claude Code on this computer.
 function answerSource({ keys = {}, cli = false, cliOk = false } = {}) {
+  if (keys.muse) return 'muse';
+  if (keys.meta) return 'meta';
   if (keys.gemini) return 'gemini';
   if (keys.anthropic) return 'anthropic';
   if (keys.nvidia) return 'nvidia';
@@ -80,6 +89,6 @@ function answerSource({ keys = {}, cli = false, cliOk = false } = {}) {
   return null;
 }
 
-const SOURCE_LABELS = { gemini: 'Gemini', anthropic: 'Anthropic', nvidia: 'Nvidia', 'claude-code': 'Claude Code' };
+const SOURCE_LABELS = { muse: 'Meta Muse', meta: 'Meta Muse', gemini: 'Gemini', anthropic: 'Anthropic', nvidia: 'Nvidia', 'claude-code': 'Claude Code' };
 
 module.exports = { AI_STUDIO_URL, SOURCE_LABELS, geminiKeyShape, plainKeyError, answerSource };

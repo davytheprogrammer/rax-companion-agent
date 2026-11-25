@@ -6,7 +6,7 @@ const { createFocusGuard, looseFocusCommand, guardedTarget, guardedAsk, clockTim
 const { VK } = require('../src/reflex/executor');
 
 const root = path.resolve(__dirname, '..');
-const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
 
 // ---- shouldClose: pure, and the whole safety story -------------------------
 test('shouldClose: only a browser window whose title names a feed', () => {
@@ -398,7 +398,7 @@ test('while the guard is on it refuses with one line naming when it lifts; off, 
 test('the refusal is wired at every door: the words, the reflex layer, Hands and the task executor', () => {
   const main = read('index.js');
   const route = main.slice(main.indexOf('async function routeUtterance('));
-  assert.ok(route.indexOf('refusedByGuard(text, source, heardAt)') > 0 && route.indexOf('refusedByGuard(text, source, heardAt)') < route.indexOf('handsClaims(text)) { routeUtteranceSlow'), 'before Hands takes the words');
+  assert.ok(route.indexOf('refusedByGuard(text, source, heardAt)') > 0 && route.indexOf('refusedByGuard(text, source, heardAt)') < route.indexOf('if (handsClaims(text'), 'before Hands takes the words');
   assert.match(main, /if \(refusedByGuard\(p\.text, p\.source \|\| 'typed', Date\.now\(\)\)\) return;/, 'typed');
   assert.match(main, /refuseSite: guardLine\n/, 'the reflex layer');
   assert.match(main, /refuseSite: guardLine,\n\s+openPath/, 'the Hands actions');

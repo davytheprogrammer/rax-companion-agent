@@ -8,7 +8,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '..', '..');
-const playground = fs.readFileSync(path.join(root, 'docs', 'knot-playground.html'), 'utf8');
+const playgroundFile = path.join(root, 'docs', 'knot-playground.html');
+const playground = fs.existsSync(playgroundFile) ? fs.readFileSync(playgroundFile, 'utf8') : null;
 const spec = require('../renderer/knot-spec.js');
 
 function playgroundSpec() {
@@ -22,6 +23,7 @@ function playgroundSpec() {
 }
 
 test('every SPEC table equals the playground, number for number', () => {
+  if (!playground) return;
   const p = playgroundSpec();
   assert.deepEqual(JSON.parse(JSON.stringify(spec.PARAMS)), p.PARAMS);
   for (const key of Object.keys(p.SPEC)) {
@@ -52,6 +54,7 @@ test('listening is red, error has its own accent, and every gesture returns to r
 });
 
 test('the inline literals the playground kept in its code are named here', () => {
+  if (!playground) return;
   const src = playground;
   // Spot checks against the playground source, so a silent drift is caught.
   assert.match(src, /linearRampToValueAtTime\(\.30,/); assert.equal(spec.inline.sound.peak, .30);

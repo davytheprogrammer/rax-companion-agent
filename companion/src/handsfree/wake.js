@@ -12,8 +12,18 @@
 
 const { cleanTranscript } = require('../guide/voice');
 
-// Match the name itself, not ordinary words containing it.
-const WAKE_RE = /^\s*(?:(?:hey|ok|okay)[,.!\s]+)?rax(?=$|[\s,.!?:;])[,.!?:;\s]*/i;
+// Match the name itself, including polite prefixes and common phonetic ASR variants.
+const WAKE_RE = /^\s*(?:(?:hey|ok|okay|hi|hello|yo|yo rax|sup)[,.!\s]+)?(?:rax|rex|racks|raxs|wracks)(?=$|[\s,.!?:;])[,.!?:;\s]*/i;
+
+// Emergency words that immediately halt autonomous execution or speech,
+// even without the wake-word prefix when a task is actively running.
+const EMERGENCY_WORDS = /^\s*(?:(?:hey|ok|okay|hi|hello|yo|yo rax|sup)[\s,]+)?(?:(?:rax|rex|racks|raxs|wracks)[\s,]+)?(?:stop(?: it| that| talking| there)?|cancel|abort|freeze|halt|pause|wait stop|shut up|hush|emergency stop)[.!]*(?:\s+please)?\s*$/i;
+
+function isEmergencyStop(text) {
+  const t = cleanTranscript(text);
+  if (!t) return false;
+  return EMERGENCY_WORDS.test(t);
+}
 
 // After the bare name ("Rax?") the next words count without repeating it.
 const ARMED_MS = 8000;
@@ -42,4 +52,4 @@ function parseWake(text, { now = Date.now(), armedUntil = 0 } = {}) {
 const WAKE_SOURCE = 'voice-wake';
 function isVoiceSource(source) { return source === 'voice' || source === WAKE_SOURCE; }
 
-module.exports = { parseWake, isVoiceSource, WAKE_SOURCE, WAKE_RE, ARMED_MS };
+module.exports = { parseWake, isEmergencyStop, isVoiceSource, WAKE_SOURCE, WAKE_RE, EMERGENCY_WORDS, ARMED_MS };

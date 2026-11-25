@@ -22,10 +22,10 @@ const { echoesPrompt } = require('./prompt-echo');
 const RATE = 16000;
 const BYTES_PER_MS = (RATE * 2) / 1000;
 const CFG = {
-  speechRms: 400,        // a chunk louder than this is speech (Pranav's SoloCast, measured live: speech ~1500 to 2100, room ~30 to 55)
-  pauseMs: 450,          // this much quiet after speech ends the segment (320 cut Pranav's natural pauses mid-command)
-  minSpeechMs: 350,      // ignore coughs and clicks
-  firstPartialMs: 650,   // do not transcribe less than this
+  speechRms: 180,        // calibrated for natural speech across diverse laptop & headset microphones
+  pauseMs: 450,          // this much quiet after speech ends the segment
+  minSpeechMs: 200,      // responsive speech start detection
+  firstPartialMs: 500,   // quick partial transcription
   partialEveryMs: 300,   // new audio needed before another partial
   maxSegmentMs: 9000,    // a segment is force-ended here (audio context stays small)
   finalBudgetMs: 3000,   // a final the resident whisper has not answered by now: it has stalled, whisper-cli takes over
@@ -193,8 +193,9 @@ function createListener({ userData, onPartial, onFinal, onCommand, log, transcri
   // Resolves to { text } with the engine's words, or { why } when whisper must answer.
   async function betterFinal(pcm, ms) {
     let timer = null;
+    const budget = (finalEngine && Number(finalEngine.budgetMs)) || CFG.betterFinalBudgetMs;
     try {
-      const overBudget = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('over budget')), CFG.betterFinalBudgetMs); });
+      const overBudget = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('over budget')), budget); });
       const words = await Promise.race([finalEngine.transcribe(pcm), overBudget]);
       const text = clean(words, ms);
       return text ? { text } : { why: 'no words' };
@@ -211,6 +212,7 @@ function createListener({ userData, onPartial, onFinal, onCommand, log, transcri
     epoch++; resetSegment(); preRoll = [];
     lastPartial = { gen: -1, speechMs: 0, text: '' };
     loudSum = loudN = quietSum = quietN = 0;
+    lastChunkAt = 0;
     if (server) server.warm();
   }
 
@@ -300,8 +302,15 @@ function createListener({ userData, onPartial, onFinal, onCommand, log, transcri
     } finally { busy = false; }
   }
 
+  let lastChunkAt = 0;
   function push(chunk) {
     if (!found.exe || !found.model) return;
+    const now = Date.now();
+    if (lastChunkAt && now - lastChunkAt > 1500) {
+      say('[listen] audio clock drift gap detected (' + (now - lastChunkAt) + 'ms); resetting segment');
+      resetSegment();
+    }
+    lastChunkAt = now;
     const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     const ms = buf.length / BYTES_PER_MS;
     const level = rms16(buf);

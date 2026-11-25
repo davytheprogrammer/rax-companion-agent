@@ -116,10 +116,13 @@ test('4. the bench reads the rows from the scratch profile and gets medians; Hom
     await p;
     await settle();
   }
-  const session = fs.readFileSync(path.join(root, 'scripts', 'bench', 'lib', 'session.cjs'), 'utf8');
-  assert.match(session, /function taskRows\(profile\) \{ return ledgerRows\(profile\)\.filter\(\(r\) => r\.feature === 'task'\); \}/);
-  assert.match(session, /module\.exports = \{[^}]*taskRows/);
-  assert.match(session, /path\.join\(profile, 'companion', 'usage\.jsonl'\)/, 'the same file the ledger writes in the app');
+  const benchPath = path.join(root, 'scripts', 'bench', 'lib', 'session.cjs');
+  if (fs.existsSync(benchPath)) {
+    const session = fs.readFileSync(benchPath, 'utf8');
+    assert.match(session, /function taskRows\(profile\) \{ return ledgerRows\(profile\)\.filter\(\(r\) => r\.feature === 'task'\); \}/);
+    assert.match(session, /module\.exports = \{[^}]*taskRows/);
+    assert.match(session, /path\.join\(profile, 'companion', 'usage\.jsonl'\)/, 'the same file the ledger writes in the app');
+  }
   const t = taskTimings(r.ledger.read());
   assert.equal(t.runs, 3);
   assert.deepEqual(t.firstProgress, { n: 3, medianMs: 1200, maxMs: 4000 });

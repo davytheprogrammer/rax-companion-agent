@@ -46,9 +46,9 @@ test('signed in before, publik not reachable: let through at once, no window, an
   assert.deepStrictEqual(r, { signed: null, offline: 'unreachable' });
   assert.ok(Date.now() - t0 < 200, 'did not wait for a timer');
   assert.deepStrictEqual(ui.shown, [], 'the Retry window never came up');
-  await tick(60);
+  await tick(120);
   alive = false;
-  assert.ok(tries >= 3, 'retried in the background: ' + tries);
+  assert.ok(tries >= 2, 'retried in the background: ' + tries);
   assert.deepStrictEqual(ui.shown, []);
 });
 

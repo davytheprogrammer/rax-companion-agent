@@ -8,7 +8,7 @@ const path = require('node:path');
 const { rewriteAsk, isTask, handsTakes } = require('../src/reflex/rules');
 const { rewriteInPlace, buildRewrite, cleanRewrite, STYLES } = require('../src/rewrite');
 const root = path.join(__dirname, '..');
-const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
 
 test('rewriteAsk names the style for the everyday asks', () => {
   const cases = {
@@ -182,7 +182,7 @@ test('the copy fallback lives in the Hands sidecar and puts the old clipboard ba
 test('the Companion routes a rewrite ahead of the reflex layer and Hands, and pastes only into the window it read', () => {
   const main = read('index.js');
   const route = main.slice(main.indexOf('async function routeUtterance('), main.indexOf('function routeUtteranceSlow('));
-  assert.ok(route.indexOf('if (ownPath(text))') > 0 && route.indexOf('if (ownPath(text))') < route.indexOf('if (handsClaims(text))'), 'before Hands');
+  assert.ok(route.indexOf('if (ownPath(text))') > 0 && route.indexOf('if (ownPath(text))') < route.indexOf('if (handsClaims(text'), 'before Hands');
   assert.ok(route.indexOf('if (ownPath(text))') < route.indexOf('getReflex()'), 'before the reflex layer');
   const slow = main.slice(main.indexOf('function routeUtteranceSlow('), main.indexOf('function routeAnswer('));
   assert.match(slow, /const rw = rewriteAsk\(kind\.text\);/);

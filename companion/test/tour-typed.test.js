@@ -9,7 +9,7 @@ const path = require('path');
 const T = require('../src/tour');
 
 const ROOT = path.join(__dirname, '..', '..');
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 // No microphone words (whisper false), no AI, no Hands: the barest PC.
 const typedCaps = { whisper: false, source: false, cli: false, keyReady: false, hands: false, english: true, ptt: 'Control+Alt', device: '', island: false, hideFromCapture: false, captureForcedOff: false, voice: { installed: true } };
 

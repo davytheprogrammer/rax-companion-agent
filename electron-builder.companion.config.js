@@ -1,8 +1,7 @@
 const base = require('./electron-builder.config.js');
-// The publik switch: Sign in with publik, usage counting and publik API (companion/src/publik).
-// true for the build listed on publik. false builds the Companion as it was in 0.1.16: no gate,
-// no publik provider, and the folder and the app token stay out of the installer.
-const PUBLIK = true;
+// The publik switch: false builds our own native Rax experience:
+// no external third-party gate, no forced sign-in paywall, pure personalized Rax onboarding.
+const PUBLIK = false;
 // A Mac app can only be packed on macOS (the build-companion-mac workflow), and a Windows one only
 // on Windows, so the host decides which native binaries go in the asar.
 const MAC = process.platform === 'darwin';
@@ -12,17 +11,17 @@ const ONNX_KEEP = MAC
     // CPU only: the GPU (DirectML) libraries are not loaded for this model.
     '!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/DirectML.dll', '!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/dx*.dll'];
 module.exports = {
-  appId: 'com.nus.companion',
+  appId: 'com.rax.companion',
   productName: 'Rax',
   copyright: base.copyright,
-  extraMetadata: { name: 'nus-companion', version: '0.1.35', main: 'src/main-companion.js', publik: PUBLIK,
+  extraMetadata: { name: 'rax-companion', version: '0.1.35', main: 'src/main-companion.js', publik: PUBLIK,
     description: 'Rax: the Knot that hears you and acts, on its own.' },
   directories: { output: 'dist-companion', buildResources: 'build' },
   // companion/** carries companion/src/stats.js (anonymous usage stats, plain
   // fetch, no SDK); @supabase and electron-updater stay out of this build.
   // src/license.js (no requires) reads the optional account's plan.
   files: ['companion/**/*', 'src/main-companion.js', 'src/ai.js', 'src/claude-pool.js', 'src/secrets.js', 'src/stt-local.js', 'src/whisper-server.js',
-    'src/crash.js', 'src/quit-guard.js', 'src/autostart.js', 'src/db.js', 'src/license.js', 'package.json',
+    'src/crash.js', 'src/quit-guard.js', 'src/autostart.js', 'src/elevate.js', 'src/db.js', 'src/license.js', 'package.json',
     '!**/*.test.js', '!**/*.bak-*', '!companion/test/**', '!docs/**', '!scripts/**', '!supabase/**',
     // Developer-only checks and the unused 3D Knot stay out of the asar.
     '!companion/verify-focus-guard.cjs', '!companion/renderer/knot3d.js',
@@ -75,6 +74,7 @@ module.exports = {
     contents: [{ x: 130, y: 220 }, { x: 410, y: 220, type: 'link', path: '/Applications' }],
   },
   win: {
+    requestedExecutionLevel: 'requireAdministrator',
     target: base.win.target, icon: 'build/icon.ico', artifactName: 'Rax-Companion-Setup.${ext}',
     extraResources: [...base.win.extraResources,
       { from: 'companion/src/reflex', to: 'win', filter: ['hands.ps1'] },
@@ -89,6 +89,6 @@ module.exports = {
       { from: 'vendor/embed-models', to: 'embed-models', filter: ['all-MiniLM-L6-v2/model_quantized.onnx', 'all-MiniLM-L6-v2/vocab.txt'] }],
   },
   portable: { artifactName: 'Rax-Companion-Portable.${ext}' },
-  nsis: { ...base.nsis, shortcutName: 'Rax', uninstallDisplayName: 'Rax' },
-  publish: [{ provider: 'github', owner: 'potlakai', repo: 'nus-companion' }],
+  nsis: { ...base.nsis, shortcutName: 'Rax', uninstallDisplayName: 'Rax', perMachine: true, allowElevation: true },
+  publish: null,
 };

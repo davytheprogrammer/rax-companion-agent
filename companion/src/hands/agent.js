@@ -51,7 +51,8 @@ function isSwitcher(fg) {
 // Word and then the Claude app came to the front, and Hands clicked "Table
 // Grid" in Word and a row in Claude, then called it done. A window it did not
 // open coming to the front now stops the task instead.
-const OPENERS = new Set(['open_app', 'open_url', 'web_search', 'open_file']);
+const OPENERS = new Set(['open_app', 'open_url', 'web_search', 'open_file', 'switch_window']);
+const NON_WINDOW_ACTIONS = new Set(['find_files', 'wait', 'look', 'run_command', 'read_file', 'write_file', 'list_directory', 'http_request', 'get_system_info', 'list_processes', 'kill_process', 'get_clipboard', 'set_clipboard', 'paste_text', 'show_notification']);
 const OPEN_GRACE_READS = 3;        // looks after an opener in which a new app may come to the front
 function appOf(fg) { return fg ? String(fg.process || '').toLowerCase() : ''; }
 
@@ -89,6 +90,7 @@ class HandsAgent {
     if (!this.active()) return;
     this.d.log('stop: ' + reason);
     this.gen++;
+    if (this.d.actions && typeof this.d.actions.run === 'function') this.d.actions.run('release_modifiers', {}).catch(() => {});
     // The model request in flight is cut too (2026-10-31): before, Esc ended
     // the task but the reply kept streaming to completion, tokens and all.
     if (this.abort) { try { this.abort.abort(); } catch (_) { /* already done */ } this.abort = null; }
@@ -167,11 +169,26 @@ class HandsAgent {
       }
       if (T.openGrace > 0) T.openGrace--;
       const sig = (screen.fg ? (screen.fg.title || '') + '|' : '') + settleSignature(screen.elements);
-      if (T.lastSig !== null && sig !== T.lastSig) { T.repeats.clear(); if (T.failed) T.failed.clear(); }
+      if (!T.sigHistory) T.sigHistory = [];
+      T.sigHistory.push(sig);
+      if (T.sigHistory.length > 6) T.sigHistory.shift();
+      const sh = T.sigHistory;
+      const isFlapping = sh.length >= 4 && sh[sh.length - 1] === sh[sh.length - 3] && sh[sh.length - 2] === sh[sh.length - 4] && sh[sh.length - 1] !== sh[sh.length - 2];
+      if (T.lastSig !== null && sig !== T.lastSig && !isFlapping) { T.repeats.clear(); if (T.failed) T.failed.clear(); }
       T.sameScreen = sig === T.lastSig ? T.sameScreen + 1 : 0;
       T.lastSig = sig;
       let note = T.note; T.note = '';
-      if (T.sameScreen >= 2) note = (note ? note + ' ' : '') + 'Nothing on screen has changed for two steps: do something genuinely different, or stop and say what is in the way.';
+      if (isFlapping) {
+        T.flappingCount = (T.flappingCount || 0) + 1;
+        this.d.log('flapping cycle detected (' + T.flappingCount + ')');
+        if (T.flappingCount >= 2) {
+          this.finish('stuck', 'I noticed this screen is looping between two states. Say "keep going" or tell me what to do next.');
+          return;
+        }
+        note = (note ? note + ' ' : '') + 'Cycle detected: you are toggling back and forth between two screen states. Do not repeat the previous actions; choose a different approach or stop and ask.';
+      } else if (T.sameScreen >= 2) {
+        note = (note ? note + ' ' : '') + 'Nothing on screen has changed for two steps: do something genuinely different, or stop and say what is in the way.';
+      }
       const llm = this.d.llm();
       if (!llm || !llm.ready) { this.finish('error', 'No AI is set up, so I cannot do that. Add a key or sign in to Claude Code in Settings.'); return; }
       const prompt = userTurn({ goal: T.goal, request: T.request, window: screen.fg ? { title: screen.fg.title, process: screen.fg.process } : null, elements: screen.elements, history: T.history, note, memory: this.d.memoryBlock() });
@@ -185,7 +202,7 @@ class HandsAgent {
       let raw;
       const ac = typeof AbortController === 'function' ? new AbortController() : null;
       this.abort = ac;
-      try { raw = await withTimeout(llm.complete({ system: SYSTEM, turns: [{ role: 'user', text: prompt }], imageDataUrl: screen.cap ? screen.cap.dataUrl : undefined, json: false, maxTokens: 700, onDelta, signal: ac ? ac.signal : undefined }), MODEL_TIMEOUT_MS, 'model'); }
+      try { raw = await withTimeout(llm.complete({ system: SYSTEM, turns: [{ role: 'user', text: prompt }], imageDataUrl: screen.cap ? screen.cap.dataUrl : undefined, json: false, maxTokens: 400, onDelta, signal: ac ? ac.signal : undefined }), MODEL_TIMEOUT_MS, 'model'); }
       catch (e) { if (gen !== this.gen) return; this.d.log('model failed: ' + clip(e.message, 400)); this.finish('error', plainAskError(llm && llm.provider, e)); return; }
       finally { if (this.abort === ac) this.abort = null; }
       if (gen !== this.gen) return;
@@ -209,7 +226,9 @@ class HandsAgent {
       const ctx = { elements: screen.elements, cap: screen.cap, originPhys: screen.originPhys, fg: screen.fg, files: T.files, browser: T.browser || null, target: T.target || null };
       const results = [];
       let halted = false, changed = null;
-      for (const action of tags.actions) {
+      for (let i = 0; i < tags.actions.length; i++) {
+        const action = tags.actions[i];
+        const isLastAction = i === tags.actions.length - 1;
         if (gen !== this.gen) return;
         const a = action.args || {};
         // Element IDs and screenshot coordinates describe the original read;
@@ -236,7 +255,7 @@ class HandsAgent {
         // The user or another application may have changed windows while the
         // model was thinking or the approval card was open. Never act on the
         // old screenshot in a different window.
-        if (this.d.foreground && !OPENERS.has(action.name) && !['find_files', 'wait', 'look'].includes(action.name) && ctx.fg && ctx.fg.hwnd) {
+        if (this.d.foreground && !OPENERS.has(action.name) && !NON_WINDOW_ACTIONS.has(action.name) && ctx.fg && ctx.fg.hwnd) {
           const current = await this.d.foreground();
           if (gen !== this.gen) return;
           if (!current || String(current.hwnd) !== String(ctx.fg.hwnd)) {
@@ -252,6 +271,15 @@ class HandsAgent {
             return;
           }
         }
+        if (action.name === 'click') {
+          const clickKey = (a.id != null ? 'id:' + a.id : (a.x != null && a.y != null ? 'xy:' + Math.round(Number(a.x) * 100) + ',' + Math.round(Number(a.y) * 100) : (a.text ? 't:' + a.text : '')));
+          const now = this.d.now();
+          if (clickKey && T.lastClick && T.lastClick.key === clickKey && (now - T.lastClick.at) < 600) {
+            this.d.log('rapid duplicate click on ' + clickKey + '; inserting 400ms settle wait');
+            await this.d.sleep(400);
+          }
+          T.lastClick = { key: clickKey, at: this.d.now() };
+        }
         const r = await this.d.actions.run(action.name, action.args, ctx);
         if (gen !== this.gen) return;
         if (ctx.files) T.files = ctx.files;
@@ -263,7 +291,10 @@ class HandsAgent {
         // Not a step to work around: the person asked to stay off this. The run ends on the line.
         if (r.guarded) { T.history.push({ prose, results, modelMs }); this.finish('guarded', r.report); return; }
         if (!r.ok) { (T.failed || (T.failed = new Set())).add(key); halted = true; break; }
-        if (!r.noLook) changed = await this.settle(r, screen, gen);
+        if (!r.noLook) {
+          const settleOverride = !isLastAction ? { ...r, settle: Math.min(Number(r.settle) || 500, 250), giveUp: Math.min(Number(r.giveUp) || 250, 150), lookAfter: Math.min(Number(r.lookAfter) || 40, 25) } : r;
+          changed = await this.settle(settleOverride, screen, gen);
+        }
         if (gen !== this.gen) return;
       }
       T.history.push({ prose, results, modelMs });
@@ -329,10 +360,10 @@ class HandsAgent {
   // 5 s cap on a screen that never changed). -> true (moved), false (did not),
   // null (no watcher).
   async settle(r, screen, gen) {
-    const ms = Math.max(300, Number(r.settle) || 1500);
-    const giveUpMs = Math.min(ms, Math.max(300, Number(r.giveUp) || Math.min(ms, 1200)));
+    const ms = Math.max(100, Number(r.settle) || 800);
+    const giveUpMs = Math.min(ms, Math.max(80, Number(r.giveUp) || Math.min(ms, 600)));
     if (r.lookAfter) await this.d.sleep(r.lookAfter);
-    if (!this.d.watcher) { await this.d.sleep(Math.min(ms, 800)); return null; }
+    if (!this.d.watcher) { await this.d.sleep(Math.min(ms, 300)); return null; }
     const baseline = this.d.fingerprint && screen.cap ? this.d.fingerprint(screen.cap) : null;
     try { const out = await this.d.watcher.waitForChange(ms, baseline, () => gen !== this.gen, { giveUpMs }); return Boolean(out.changed); }
     catch (_) { return null; }

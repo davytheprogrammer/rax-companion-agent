@@ -36,7 +36,7 @@ test('push-to-talk is wired: hotkey, probe keyup, renderer mic route, spoken lin
   assert.match(preload, /'ptt:state'/);
   const js = read('renderer', 'renderer.js');
   assert.match(js, /nus\.on\('ptt:state'/);
-  assert.match(js, /if \(pttHeld\) nus\.pttPcm\(e\.data\.buffer\);\n\s+else if \(captureOn\(\)\) nus\.micPcm\(e\.data\.buffer\);\n\s+else if \(tourMic\) \{ tourLevel\(e\.data\.level\); return; \}\n\s+else return;/, 'one mic, two sinks, the tour\'s bars, and silence between presses');
+  assert.match(js, /if \(pttHeld\) nus\.pttPcm\(e\.data\.buffer\);(?:\r?\n\s+else if \(wakeWordActive\(\)\) nus\.pttPcm\(e\.data\.buffer\);)?\r?\n\s+else if \(captureOn\(\)\) nus\.micPcm\(e\.data\.buffer\);\r?\n\s+else if \(tourMic\) \{ tourLevel\(e\.data\.level\); return; \}\r?\n\s+else return;/, 'one mic, two sinks, the tour\'s bars, and silence between presses');
   assert.match(js, /const MIC_WARM_MS = 45000;/, 'the mic stays warm between presses');
   assert.match(js, /function say\(text, opts\)/, 'spoken step lines, queued');
   assert.match(js, /if \(p\.speak\) say\(p\.speak\)/);

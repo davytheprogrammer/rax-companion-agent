@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer, webFrame, webUtils } = require('electron');
 // they can never collide with the desktop window's handlers in the shared
 // main process. Event channels arrive via webContents.send targeted at this
 // window only, so they keep their short names.
-contextBridge.exposeInMainWorld('nus', {
+const bridge = {
   setZoomLevel: (level) => webFrame.setZoomLevel(level),
   getZoomLevel: () => webFrame.getZoomLevel(),
   platform: process.platform,
@@ -61,8 +61,10 @@ contextBridge.exposeInMainWorld('nus', {
   assignmentBench: (payload) => ipcRenderer.invoke('companion:assignment:bench', payload),
   on: (channel, cb) => {
     const allowed = ['mouse:forced', 'capture:state', 'llm:start', 'llm:token', 'llm:done', 'llm:error', 'llm:busy', 'status', 'transcript', 'spar:state', 'cursor:probe', 'touchpad:event', 'knot:set', 'tour:start', 'daily:line', 'capture:limit', 'cursor:away',
-      'assignment:takeover', 'assignment:paint', 'assignment:voice', 'guide:state', 'guide:target', 'guide:update', 'guide:retract', 'guide:bubble', 'guide:done', 'guide:hint', 'guide:say', 'guide:circle', 'voice:state', 'voice:hush', 'knot:corner', 'knot:pos', 'knot:move', 'knot:size', 'knot:island', 'hands:state', 'tasks:event', 'tasks:windows', 'tour:card', 'tour:update', 'tour:end', 'knot:backdrop', 'power:state', 'ptt:state', 'settings:changed', 'capture:policy', 'focus:guard', 'play:start', 'quick:open'];
+      'assignment:takeover', 'assignment:paint', 'assignment:voice', 'guide:state', 'guide:target', 'guide:update', 'guide:retract', 'guide:bubble', 'guide:done', 'guide:hint', 'guide:say', 'guide:circle', 'voice:state', 'voice:hush', 'cues:play', 'knot:corner', 'knot:pos', 'knot:move', 'knot:size', 'knot:island', 'hands:state', 'tasks:event', 'tasks:windows', 'tour:card', 'tour:update', 'tour:end', 'knot:backdrop', 'power:state', 'ptt:state', 'settings:changed', 'capture:policy', 'focus:guard', 'play:start', 'quick:open'];
     if (!allowed.includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => cb(data));
   }
-});
+};
+contextBridge.exposeInMainWorld('rax', bridge);
+contextBridge.exposeInMainWorld('nus', bridge);

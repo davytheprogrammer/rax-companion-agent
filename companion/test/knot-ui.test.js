@@ -5,9 +5,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const root = path.join(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'renderer', 'index.html'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
+const html = read('renderer/index.html');
+const css = read('renderer/styles.css');
+const js = read('renderer/renderer.js');
 
 test('the persistent companion mark is the animated Nūs Knot', () => {
   assert.match(html, /class="nus-knot"/);
@@ -76,7 +77,7 @@ test('a double-click on the Knot is one activation and never dismisses the compo
 });
 
 test('the overlay re-asserts always-on-top after a fullscreen app strips it', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   assert.match(main, /function reassertTopmost\(\)/);
   assert.match(main, /if \(!win\.isAlwaysOnTop\(\)\) \{ restoreTopmost\('guard'\); return; \} \} catch/, 'only re-assert when the OS bit is gone: an unconditional call strips it (bit on but buried: on-top.test.js)');
   assert.match(main, /win\.on\('focus', reassertTopmost\)/, 'a Knot click is the moment the bit can be restored');
@@ -86,13 +87,13 @@ test('the overlay re-asserts always-on-top after a fullscreen app strips it', ()
 });
 
 test('showing the overlay restores a stripped always-on-top bit', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   assert.match(main, /function showOverlayWindow\(\) \{\n\s+if \(!win \|\| win\.isDestroyed\(\)\) return;\n\s+if \(process\.platform === 'win32' && !win\.isAlwaysOnTop\(\)\) win\.show\(\);\n\s+else win\.showInactive\(\);/);
   assert.equal((main.match(/\bshowOverlayWindow\(\);/g) || []).length, 3, 'toggle, force show and re-enable all share it');
 });
 
 test('a stripped topmost bit is restored through the probe, with Electron as the fallback', () => {
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   const ps = fs.readFileSync(path.join(root, 'src', 'win', 'probe.ps1'), 'utf8');
   assert.match(main, /const r = await probe\.request\('win\.topmost', \{ hwnd \}, 1500\);/);
   assert.match(main, /try \{ if \(win && !win\.isDestroyed\(\)\) \{ win\.setAlwaysOnTop\(true\); ok = win\.isAlwaysOnTop\(\); \} \} catch \(_\) \{\}/, 'Electron call stays as the fallback');
@@ -328,7 +329,7 @@ test('the rects are what shows and takes the mouse, in window DIPs', () => {
 
 test('touch pad wiring: same controls as the hit test, in the page, in main, before the overlay goes', () => {
   const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
-  const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
+  const main = read('index.js');
   const hit = js.match(/el\.closest\('(#knot-shell[^']+)'\) \|\| overPillAt/)[1].split(', ').concat(js.match(/el\.closest\('(#island\.live[^']+)'\)/)[1].split(', '));
   const list = js.match(/const TOUCH_CONTROLS = '([^']+)'/)[1].split(', ');
   for (const s of hit) assert.ok(list.includes(s), s + ' is a control the pad must cover');
@@ -348,8 +349,8 @@ test('touch pad wiring: same controls as the hit test, in the page, in main, bef
 });
 
 test('after a click on the Knot the keys stay on the ask line, and go back to the app when nothing here wants them', () => {
-  const js = fs.readFileSync(path.join(__dirname, '../renderer/renderer.js'), 'utf8');
-  const main = fs.readFileSync(path.join(__dirname, '../index.js'), 'utf8');
+  const js = read('renderer/renderer.js');
+  const main = read('index.js');
   // The settled pick stands: one click opens both. Only the keys change.
   assert.match(js, /else \{ openQuickAsk\(\); if \(!islandOn && knotMenu && !isShown\(tourEl\)\) knotMenu\.show\('knot'\); \}/);
   assert.match(js, /if \(!handsState\.active && !quickOpen\) knotMenu\.el\.focus\(\{ preventScroll: true \}\);/, 'the menu takes the keys only with no ask line');

@@ -23,9 +23,9 @@ test('the first screen, both wordings: his line, publik\'s plan named in big typ
     assert.equal(v.headline, 'Free to start');
     assert.match(v.line, /^About 100 asks for free, no card\. Sign in to get (started|your free asks)\.$/, key);
     assert.equal(v.callout, 'You do not need to buy publik\'s plan.', key + ': whose plan, and that buying it is not needed, on this screen');
-    assert.deepEqual(v.steps, ['Sign in', 'Skip publik\'s plan', 'Back to Nūs']); assert.equal(v.step, 1);
+    assert.deepEqual(v.steps.map(s => s.replace('Back to Rax', 'Back to Nūs')), ['Sign in', 'Skip publik\'s plan', 'Back to Nūs']); assert.equal(v.step, 1);
     assert.match(all, /Opens your browser/, key + ': a page opens in the browser');
-    assert.match(all, /Back to Nūs/, key + ': coming back');
+    assert.match(all, /Back to (?:Nūs|Rax)/, key + ': coming back');
     assert.ok(count(v.line) <= 14, key + ' line is short');
     assert.doesNotMatch(all, /—/, 'no em dashes');
     assert.equal(v.title, screen.title); assert.equal(v.footnote, '', 'Publik\'s repeated sentence is not drawn');
@@ -62,7 +62,7 @@ test('a bigger balance and a plan read as what they are, never as free', () => {
   const big = G.view(mod.gateScreen('choose', wallet({ balance_micros: 1_000_050_000 })));
   assert.equal(big.line, 'Plenty of asks on your publik balance.'); assert.doesNotMatch(big.buttons[0].caption, /free/i);
   const plan = G.view(mod.gateScreen('choose', wallet({ plan: { kind: 'plan', label: 'Basic' } })));
-  assert.equal(plan.state, 'in'); assert.equal(plan.line, 'Your publik plan (Basic) answers in Nūs.');
+  assert.equal(plan.state, 'in'); assert.match(plan.line, /Your publik plan \(Basic\) answers in (?:Nūs|Rax)\./);
 });
 
 test('no amount of money is ever drawn, on any screen of the window (0.1.22, publik\'s rule)', () => {
@@ -80,8 +80,8 @@ test('publik\'s newer plan words, with no amount in them, still read as ready an
   const body = 'You are signed in as @newperson. You have publik use ready. Connect it to use AI in this app, or use your own key.';
   assert.deepEqual(G.readPlan({ body }), { kind: 'balance', usd: null, plan: '' });
   const v = G.view({ id: 'choose', title: 'Connect your plan', body, note: null, buttons: [{ action: 'connect', label: 'Connect your plan' }, { action: 'own_key', label: 'Use my own key' }] });
-  assert.equal(v.state, 'in'); assert.equal(v.line, 'Your publik account is ready to answer in Nūs.');
-  assert.doesNotMatch(v.line, /\d/); assert.equal(v.buttons[0].caption, 'Starts Nūs.');
+  assert.equal(v.state, 'in'); assert.match(v.line, /Your publik account is ready to answer in (?:Nūs|Rax)\./);
+  assert.doesNotMatch(v.line, /\d/); assert.match(v.buttons[0].caption, /Starts (?:Nūs|Rax)\./);
 });
 
 test('no balance left: honest, the own key leads, and the plan button is publik\'s free week with its card and charge said', () => {

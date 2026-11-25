@@ -1,7 +1,7 @@
 // The guide loop with every dependency faked: capture, probe, model, renderer.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { GuideSession } = require('../src/guide/session');
+const { GuideSession, SETTLE_AFTER_CLICK_MS } = require('../src/guide/session');
 const { createWalkthroughs } = require('../src/guide/walkthroughs');
 
 const CAP = { dataUrl: 'data:image/png;base64,AAAA', width: 1280, height: 720, pxWidth: 1920, pxHeight: 1080, display: { bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 1 } };
@@ -194,7 +194,7 @@ test('with a screen watcher a click waits for the screen to move and still, and 
   g.onArrived();
   await g.onClick({ x: 160, y: 212 });
   assert.equal(waits.length, 1);
-  assert.equal(waits[0].ms, 1500);
+  assert.equal(waits[0].ms, SETTLE_AFTER_CLICK_MS);
   assert.equal(waits[0].baseline[0], 7, 'the pre-click print is the baseline');
   assert.equal(last(sent, 'guide:target').kicker, 'step 2', 'a fresh model step, not "again"');
   assert.ok(logs.some((m) => /settle: moved and still/.test(m)));

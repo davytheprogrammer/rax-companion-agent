@@ -88,6 +88,8 @@
     assistShortcut = s.shortcuts?.assist || DEFAULT_ASSIST_SHORTCUT;
     cues.setEnabled(s.sounds !== false);
     syncAssistShortcutLabels();
+    if (wakeWordActive() && !micStream) startMic();
+    else if (!wakeWordActive() && !pttHeld && !captureOn()) stopMic();
     if (isShown($('#settings-scrim'))) fillSettings();
   });
 
@@ -438,6 +440,25 @@
   nus.on('power:state', (p) => { if (knot3d && knot3d.setLowPower) knot3d.setLowPower(!!(p && p.battery)); });
   // "Stop" / "I got it from here": quiet at once, mid-word.
   nus.on('voice:hush', () => stopSpeaking());
+  nus.on('power:suspend', () => {
+    stopSpeaking();
+    if (audioCtx && audioCtx.state === 'running') {
+      try { audioCtx.suspend(); } catch (_) {}
+    }
+  });
+  nus.on('power:resume', () => {
+    nus.log('power resume: checking audio context and microphone');
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch((e) => nus.log('audioCtx resume: ' + e.message));
+    }
+    if (wakeWordActive() || pttHeld) {
+      reopenMic('system resume');
+    }
+  });
+  nus.on('cues:play', (p) => {
+    if (p && p.name && cues.play) cues.play(p.name);
+    if (p && p.name && knot3d && knot3d.gesture) knot3d.gesture(p.name);
+  });
   function speakSystem(line) {
     const u = trackSpeech(new SpeechSynthesisUtterance(line), line.length);
     if (voice) u.voice = voice;
@@ -496,6 +517,17 @@
     let restart = !opts || opts.restart !== false;
     const line = plainify(String(text)).slice(0, 300);
     if (!line.trim()) return;
+    try {
+      islandLine(line, Math.max(4000, line.length * 65));
+      const sub = $('#knot-status-subtitle');
+      if (sub) {
+        sub.textContent = line;
+        clearTimeout(sub._subTimer);
+        sub._subTimer = setTimeout(() => {
+          if (sub.textContent === line) syncKnotUi();
+        }, Math.max(4000, line.length * 65));
+      }
+    } catch (_) {}
     if (opts && opts.ack) ackHoldUntil = Date.now() + ACK_HOLD_MS;
     else if (restart && Date.now() < ackHoldUntil) { restart = false; ackHoldUntil = 0; }
     if (restart) { sayQueue.length = 0; sayBusy = false; voiceGen++; try { speechSynthesis.cancel(); } catch (_) {} if (voiceSource) { try { voiceSource.stop(); } catch (_) {} voiceSource = null; } if (nus.voiceStop) nus.voiceStop(); }
@@ -743,6 +775,7 @@
   let audioCtx = null, micStream = null, micNode = null, micProc = null;
   let pttHeld = false;
   let handsFreeListening = false;
+  const wakeWordActive = () => Boolean(settings && settings.wakeWord && (settings.openMic !== false));
   const captureOn = () => $('#stop-btn').classList.contains('active');
   // A mic that died underneath us (Chromium's audio service was killed, the
   // device was unplugged, the context closed) must not count as "already
@@ -808,11 +841,12 @@
       // warm for a while (see ptt:state) and its audio goes nowhere.
       micProc.port.onmessage = (e) => {
         if (pttHeld) nus.pttPcm(e.data.buffer);
+        else if (wakeWordActive()) nus.pttPcm(e.data.buffer);
         else if (captureOn()) nus.micPcm(e.data.buffer);
         else if (tourMic) { tourLevel(e.data.level); return; }
         else return;
         pushLevel(e.data.level);
-        if (pttHeld && knot3d && knot3d.setLevel) knot3d.setLevel(Math.min(1, (e.data.level || 0) * 7));
+        if ((pttHeld || wakeWordActive()) && knot3d && knot3d.setLevel) knot3d.setLevel(Math.min(1, (e.data.level || 0) * 7));
       };
       const sink = audioCtx.createGain(); sink.gain.value = 0; // run processor silently
       micNode.connect(micProc); micProc.connect(sink); sink.connect(audioCtx.destination);
@@ -952,7 +986,7 @@
     if (pttHeld) { stopSpeaking(); startMic(); }
     else {
       if (knot3d && knot3d.setLevel) knot3d.setLevel(0);
-      if (!captureOn()) { if (stopNow) stopMic(); else micIdleTimer = setTimeout(() => { if (!pttHeld && !captureOn()) stopMic(); }, MIC_WARM_MS); }
+      if (!captureOn() && !wakeWordActive()) { if (stopNow) stopMic(); else micIdleTimer = setTimeout(() => { if (!pttHeld && !captureOn() && !wakeWordActive()) stopMic(); }, MIC_WARM_MS); }
       ack({ silent: true });
       cues.play('release');
     }
@@ -1048,6 +1082,7 @@
 
   function fillSettings() {
     document.querySelectorAll('#provider-seg button').forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
+    if ($('#key-meta')) $('#key-meta').value = (settings.apiKeys && (settings.apiKeys.muse || settings.apiKeys.meta)) || '';
     $('#key-openai').value = settings.apiKeys.openai || '';
     $('#key-anthropic').value = settings.apiKeys.anthropic || '';
     $('#key-typesafe').value = settings.apiKeys.typesafe || '';
@@ -1120,9 +1155,9 @@
     await nus.settingsSet({ resumeContext: '' });
   });
   function statusText() {
-    const k = settings.apiKeys;
-    const has = [k.openai && 'OpenAI', k.anthropic && 'Anthropic', k.gemini && 'Gemini', k.nvidia && 'Nvidia'].filter(Boolean);
-    const stt = k.openai ? 'Whisper' : (k.gemini ? 'Gemini' : 'none');
+    const k = settings.apiKeys || {};
+    const has = [k.meta && 'Meta Muse', k.openai && 'OpenAI', k.anthropic && 'Anthropic', k.gemini && 'Gemini', k.nvidia && 'Nvidia'].filter(Boolean);
+    const stt = k.meta ? 'Meta Muse' : (k.openai ? 'Whisper' : (k.gemini ? 'Gemini' : 'none'));
     const base = 'Active: ' + settings.provider + ' · keys: ' + (has.join(', ') || 'none set') + ' · transcription: ' + stt;
     return (settings._migrationNote && !has.length) ? settings._migrationNote + '\n' + base : base;
   }
@@ -1134,6 +1169,11 @@
     $('#s-status').textContent = statusText();
   }));
   async function saveSettings() {
+    if ($('#key-meta')) {
+      const kv = $('#key-meta').value.trim();
+      settings.apiKeys.meta = kv;
+      settings.apiKeys.muse = kv;
+    }
     settings.apiKeys.typesafe = $('#key-typesafe').value.trim();
     settings.apiKeys.openai = $('#key-openai').value.trim();
     settings.apiKeys.anthropic = $('#key-anthropic').value.trim();
@@ -2663,7 +2703,7 @@
     quickAbout = about || null;
     quickContact = !!contact && !quickAbout;
     quickFeedback = !!feedback && !quickAbout && !quickContact;
-    quickInput.placeholder = quickContact ? 'Your email, then Enter' : quickFeedback ? 'Tell Pranav what to fix or build' : quickAbout ? 'Ask about "' + quickAbout + '"' : QUICK_PLACEHOLDER;
+    quickInput.placeholder = quickContact ? 'Your email, then Enter' : quickFeedback ? 'Tell Rax what to fix or build' : quickAbout ? 'Ask about "' + quickAbout + '"' : QUICK_PLACEHOLDER;
     // Live at once: the line takes the keys from the first frame, whatever the
     // thread is still doing.
     openSlotSurface(quickAsk, () => placeByKnot(quickAsk), { origin: originAt(quickAsk, slotPoint) }, wait);
@@ -3537,6 +3577,7 @@
     syncPlaceholder();
     const st = await nus.captureState();
     syncCaptureUi(st.active);
+    if (wakeWordActive() && !micStream) startMic();
     // First run: the drawn hello, then the tutorial. After that, the tutorial alone.
     if (standalone && !settings.onboarded && !settings.introSeen) setTimeout(playIntro, 900);
     // First-run: the dashboard tour opens this tutorial at its Companion step

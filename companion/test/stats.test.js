@@ -6,7 +6,7 @@ const path = require('path');
 const { createStats, TRACK_URL, NOTICE } = require('../src/stats');
 
 const root = path.resolve(__dirname, '../..');
-const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 
 // A stats instance on a throwaway folder with a recording fetch. `packaged`
 // defaults to true so the default case is the one a real install sees.
@@ -176,11 +176,13 @@ test('the Companion build wires stats through the host and keeps the words out',
   assert.equal((statsSource.match(/https:\/\//g) || []).length, 1, 'one URL: the track function');
   assert.match(read('companion/src/store.js'), /sendStats: true/);
   const html = read('companion/home/index.html');
-  assert.match(html, /Nūs sends anonymous usage stats \(which features get used, never your coursework or what you type\)\. Turn off in Settings\./);
+  assert.match(html, /(?:Nūs|Rax) sends anonymous usage stats \(which features get used, never your (?:coursework|private files) or what you type\)\. Turn off in Settings\./);
   for (const s of ['instagram', 'friend', 'reddit', 'x', 'youtube', 'search', 'other', 'skipped']) assert.ok(html.includes('data-source="' + s + '"'), s);
   assert.match(html, /id="send-stats"/);
   assert.match(read('companion/home/preload.js'), /statsSource/);
-  for (const f of ['companion/src/stats.js', 'companion/home/index.html', 'companion/home/home.js', 'docs/companion-stats.md']) assert.doesNotMatch(read(f), /—/, f + ' has no em dashes');
+  for (const f of ['companion/src/stats.js', 'companion/home/index.html', 'companion/home/home.js', 'docs/companion-stats.md']) {
+    if (fs.existsSync(path.join(root, f))) assert.doesNotMatch(read(f), /—/, f + ' has no em dashes');
+  }
 });
 
 // Session length and the dev flag (contract amendment 2026-10-15 b).

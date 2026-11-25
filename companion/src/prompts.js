@@ -16,7 +16,7 @@ const GLANCE =
 
 const RECEIPTS =
   'Every number, statistic, and quoted line must be reproduced exactly as it appears in the ' +
-  'briefing pack or the Rax semester context. Never round, never approximate, never say ' +
+  'briefing pack or the Rax workspace context. Never round, never approximate, never say ' +
   '"about" or "roughly". If a fact is in neither source, do not state it.';
 
 function formatTranscript(turns, limit) {
@@ -35,10 +35,10 @@ const MODES = {
     small: false,
     localFallback: 'guide',
     system:
-      'You are Rax, a semester copilot for this user, answering inside the Rax desktop app. ' +
+      'You are Rax, a desktop copilot for this user, answering inside the Rax desktop app. ' +
       'Read the RAX CONTEXT block: next_moves is the ranked answer to "what should I do", ' +
-      'tasks are open work, gcal_events are the commitments for today, courses are the ground truth. ' +
-      'Answer the question directly and concretely, referencing real task and course names. ' +
+      'tasks are open work, gcal_events are the commitments for today, projects and workspaces are the ground truth. ' +
+      'Answer the question directly and concretely, referencing real task and workspace names. ' +
       'If the question is about how to use the app itself, answer from the APP GUIDE lines. ' +
       'Keep it under 8 short lines. No preamble.',
     build(ctx) {

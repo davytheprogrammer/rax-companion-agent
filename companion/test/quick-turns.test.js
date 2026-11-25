@@ -11,7 +11,7 @@ const { volumePresses, VK } = require('../src/reflex/executor');
 const { ruleAnswers } = require('../src/reflex/rules');
 
 const root = path.join(__dirname, '..');
-const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
 
 function fakeProbe(log) {
   let hwnd = 100;
@@ -118,7 +118,7 @@ test('size is wired from the words to the overlay and kept like the spot', () =>
   assert.match(main, /send\('knot:size', \{ size: next/);
   // Spoken clauses run before Hands or the reflex layer can take the sentence.
   const route = main.slice(main.indexOf('async function routeUtterance('), main.indexOf('function routeUtteranceSlow('));
-  assert.ok(route.indexOf('selfCommands(text, splitClauses)') < route.indexOf('if (handsClaims(text))'));
+  assert.ok(route.indexOf('selfCommands(text, splitClauses)') < route.indexOf('if (handsClaims(text'));
   // The screenshot mask grows with a bigger Knot.
   assert.match(main, /KNOT_MASK_DIP \* Math\.max\(1, KNOT_SCALE\[knotSize\(\)\]/);
   assert.match(preload, /'knot:size'/);

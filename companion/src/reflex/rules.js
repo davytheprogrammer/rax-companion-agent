@@ -159,7 +159,7 @@ function needsScreen(text) {
 // to type, or two actions in a row. A "how do I" / "where is" ask is never a
 // task: that is the guide. Conservative on purpose; the reflex layer still
 // takes the one-word ones (open, type, search) before this is consulted.
-const TASK_VERB = '(?:open|launch|start|create|make|draft|compose|install|uninstall|configure|enable|disable|change|adjust|connect|disconnect|restart|refresh|minimi[sz]e|maximi[sz]e|fetch|go to|navigate to|click|tap|press|select|choose|pick|type|write|enter|fill(?: in| out)?|scroll|find|search|look up|look for|play|pause|send|email|e-mail|mail|text|message|dm|reply|post|submit|turn in|hand in|book|order|add|remove|delete|close|save|download|upload|attach|drag|move|rename|sort|filter|apply|sign in|log in|check|compare|read|summari[sz]e|grab|copy|paste|share|watch|list|tidy|clean up|organi[sz]e|set|turn on|turn off|switch|mute|unmute)';
+const TASK_VERB = '(?:open|launch|start|create|make|draft|compose|install|uninstall|configure|enable|disable|change|adjust|connect|disconnect|restart|refresh|minimi[sz]e|maximi[sz]e|fetch|go to|navigate to|click|tap|press|select|choose|pick|type|write|enter|fill(?: in| out)?|scroll|find|search|look up|look for|play|pause|send|email|e-mail|mail|text|message|dm|reply|post|submit|turn in|hand in|book|order|add|remove|delete|close|save|download|upload|attach|drag|move|rename|sort|filter|apply|sign in|log in|check|compare|read|summari[sz]e|grab|copy|paste|share|watch|list|tidy|clean up|organi[sz]e|set|turn on|turn off|switch|mute|unmute|run|execute|build|clone|pull|push|commit|test|kill|terminate|notify|alert|scan|scrape|inspect|automate)';
 // Polite openers before the verb: "Hello Rax, can you email ..." (live
 // 2026-10-13 that form missed the task rules and went to the reflex layer).
 const TASK_LEAD = '(?:(?:hey|hi|hello|yo|ok|okay|so|um|uh|please|rax|nus|nūs|news|can you|could you|would you|will you|can u|lets|let\'s|now|just|go ahead and|i want you to|i need you to|i\'d like you to)[\\s,]+)*';
@@ -178,7 +178,7 @@ const HOWTO = /\b(how (do|can|would|should) (i|you|we)|how to|where (is|are|do i
 const KNOWLEDGE_ASK = new RegExp('^\\s*' + TASK_LEAD + '(?:summari[sz]e|sum up|recap|explain|describe)\\b', 'i');
 function isTask(text) {
   const t = String(text || '').trim();
-  if (!t || HOWTO.test(t)) return false;
+  if (!t || HOWTO.test(t) || rewriteAsk(t)) return false;
   if (KNOWLEDGE_ASK.test(t) && !/\b(?:my|this|these|that|here|it)\b/i.test(t) && !THEN_ACT.test(t) && !SEEK_THERE.test(t) && !namesTarget(t)) return false;
   return TASK_RE.test(t) || THEN_ACT.test(t) || SEEK_THERE.test(t);
 }

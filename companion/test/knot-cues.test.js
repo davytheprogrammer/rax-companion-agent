@@ -7,10 +7,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const dir = path.join(__dirname, '..', 'renderer');
-const specSrc = fs.readFileSync(path.join(dir, 'knot-spec.js'), 'utf8');
-const cuesSrc = fs.readFileSync(path.join(dir, 'cues.js'), 'utf8');
-const surfaceSrc = fs.readFileSync(path.join(dir, 'surface.js'), 'utf8');
-const js = fs.readFileSync(path.join(dir, 'renderer.js'), 'utf8');
+const specSrc = fs.readFileSync(path.join(dir, 'knot-spec.js'), 'utf8').replace(/\r\n/g, '\n');
+const cuesSrc = fs.readFileSync(path.join(dir, 'cues.js'), 'utf8').replace(/\r\n/g, '\n');
+const surfaceSrc = fs.readFileSync(path.join(dir, 'surface.js'), 'utf8').replace(/\r\n/g, '\n');
+const js = fs.readFileSync(path.join(dir, 'renderer.js'), 'utf8').replace(/\r\n/g, '\n');
 
 function fixture() {
   let now = 0; const oscs = [], gains = [];

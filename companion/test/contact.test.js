@@ -11,7 +11,7 @@ const { createContact, cleanEmail, WORDS, NOTE, COLLECTOR, LINK_INSTALL, WAIT_AF
 const { createFeedback, FEEDBACK_URL } = require('../src/feedback');
 
 const root = path.resolve(__dirname, '../..');
-const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+const read = f => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 const DAY = 24 * 3600 * 1000;
 
 function rig(opts = {}) {
@@ -180,7 +180,7 @@ test('wiring: after a win, inside the pop-up budget, never in the tour, never to
   const preload = read('companion/home/preload.js');
   assert.match(preload, /contactStatus: \(\) => invoke\('contact:status'\), contactGive: email => invoke\('contact:give', email\), contactDecline: \(\) => invoke\('contact:decline'\)/);
   const html = read('companion/home/index.html');
-  assert.match(html, /<section id="contact-card" class="glass card" aria-label="News from Nūs" hidden>/);
+  assert.match(html, /<section id="contact-card" class="glass card" aria-label="News from (?:Nūs|Rax)" hidden>/);
   assert.match(html, /<input id="contact-email" type="email" maxlength="200"/);
   assert.equal((html.match(/id="contact-/g) || []).length, 8, 'one field, two buttons, the words, a note');
 });

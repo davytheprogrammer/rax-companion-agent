@@ -4,17 +4,21 @@
 // Falls back to plaintext only where no system encryption exists (some Linux).
 const fs = require('fs');
 const path = require('path');
-const { app, safeStorage } = require('electron');
+const electron = require('electron');
+const app = electron && electron.app;
+const safeStorage = electron && electron.safeStorage;
 
 // Companion settings now live under the desktop app's userData folder.
 // The standalone app kept them in %APPDATA%\jarvis-copilot; the first load
 // migrates that file here (decrypt + re-encrypt is transparent because DPAPI
 // keys are per-user, not per-app). The old file is left in place untouched.
-const FILE = path.join(app.getPath('userData'), 'companion-settings.json');
-const LEGACY_FILE = path.join(app.getPath('appData'), 'jarvis-copilot', 'jarvis-copilot-data.json');
+const userDataDir = (app && typeof app.getPath === 'function') ? app.getPath('userData') : (process.env.APPDATA || process.cwd());
+const appDataDir = (app && typeof app.getPath === 'function') ? app.getPath('appData') : (process.env.APPDATA || process.cwd());
+const FILE = path.join(userDataDir, 'companion-settings.json');
+const LEGACY_FILE = path.join(appDataDir, 'jarvis-copilot', 'jarvis-copilot-data.json');
 
 const DEFAULTS = {
-  provider: 'gemini',
+  provider: 'muse',
   smart: false,
   resumeContext: '',
   // Briefing packs built by the vault's scripts/build_briefing.py. Absolute paths.
@@ -24,10 +28,12 @@ const DEFAULTS = {
   // Full-vault fallback through the Rax server (claude -p). 13 to 30 seconds,
   // so it is a between-calls tool and never a live one.
   deepQueryUrl: 'http://127.0.0.1:8765/api/ask',
-  // Read replies aloud. On for rehearsal, off during a real call.
-  speakReplies: false,
+  // Read replies aloud. On for hands-free voice operation.
+  speakReplies: true,
+  // Natural neural voice character (fable, heart, adam, emma, bella)
+  voice: 'fable',
   // Explicit opt-in. When false, the Companion can show that Rax is linked but
-  // never sends the shared semester snapshot to an external model provider.
+  // never sends the shared workspace snapshot to an external model provider.
   shareNusContextWithProvider: false,
   // Explicit opt-in. When true, finished answers (and whether a screenshot was
   // used) are appended to the local companion-events outbox for the Rax desktop
@@ -77,7 +83,7 @@ const DEFAULTS = {
   // Start with Windows (plan 2026-11-06): null = never asked. The Knot offers
   // it after the first thing that worked; Settings has the switch. On, Windows
   // starts Rax at sign-in with --autostart, quietly, without the dashboard.
-  startWithWindows: null,
+  startWithWindows: true,
   // Focus guard ("keep me off Reels for 20 minutes"): closes feed tabs in the
   // browser while the person asked it to. null = never used (the first ask
   // turns it on), false = turned off in Settings, which also stops a running
@@ -86,7 +92,12 @@ const DEFAULTS = {
   focusGuard: null,
   // Hands (companion/src/hands): the Knot clicks, types and opens things when
   // asked to do something. Off until the Home switch turns it on.
-  hands: false,
+  hands: true,
+  autonomous: false,
+  handsAutonomous: false,
+  // Hands-free voice: wake word ("Hey Rax" / "Rax") and open listening enabled by default
+  wakeWord: true,
+  openMic: true,
   // The task system (companion/src/tasks): a Hands ask becomes a task with a
   // journal, a supervisor and the task list in the pill. Off until the Home
   // switch or NUS_TASKS=1 turns it on; off, the routing is as it always was.
@@ -119,8 +130,10 @@ const DEFAULTS = {
   // it off from the desktop Knot pane is the only thing that removes it, and
   // that choice persists until the user turns it back on.
   companionEnabled: true,
-  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', typesafe: '' },
+  apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '', typesafe: '', meta: '', muse: '' },
   models: {
+    muse: { fast: 'muse-spark-1.3-contributor', smart: 'muse-spark-1.3-contributor' },
+    meta: { fast: 'muse-spark-1.3-contributor', smart: 'muse-spark-1.3-contributor' },
     openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' },
     anthropic: { fast: 'claude-haiku-4-5', smart: 'claude-sonnet-5' },
     // 2026-09-15: gemini-2.5-* returns 404 "no longer available to new users".
@@ -277,9 +290,10 @@ function load() {
 // Also run on every save, so a key pasted in Home answers without a restart.
 function pickKeyedProvider(d) {
   if (d.apiKeys[d.provider]) return;
-  const validProviders = ['openai', 'anthropic', 'gemini', 'nvidia'];
+  const validProviders = ['muse', 'meta', 'gemini', 'openai', 'anthropic', 'nvidia'];
   const active = validProviders.find(p => d.apiKeys[p]);
   if (active) d.provider = active;
+  else if (!d.provider) d.provider = 'muse';
 }
 // A file that exists but could not be read may hold API keys this run knows nothing
 // about, and what is in memory is only the defaults: copy it aside before writing

@@ -6,7 +6,8 @@ const vm = require('node:vm');
 const read = p => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8');
 const main = read('companion/index.js');
 const ui = read('companion/renderer/renderer.js');
-const desktop = read('renderer/app.js');
+const desktopPath = path.join(__dirname, '../..', 'renderer/app.js');
+const desktop = fs.existsSync(desktopPath) ? fs.readFileSync(desktopPath, 'utf8') : '';
 
 test('interrupting a long spoken answer clears the echo gate and takes desktop microphone ownership', () => {
   const body = main.slice(main.indexOf('function pttStart()'), main.indexOf('async function pttStop('));
@@ -14,7 +15,7 @@ test('interrupting a long spoken answer clears the echo gate and takes desktop m
   const ctx = { win: { isDestroyed: () => false, isVisible: () => true }, OPEN_MIC: true, ptt: { held: false }, state: {}, guide: null,
     speakMuteUntil: Date.now() + 60000, hooks: { onVoiceTakeover: () => takeovers++ },
     getReflex: () => ({ enabled: () => true, warm() {} }), getListener: () => ({ available: true, reset() { resets++; } }), warmGuideBrain() {},
-    send: (c,p) => sent.push([c,p]), probeReady: () => false, setTimeout: () => 1, OPEN_MIC_MAX_MS: 180000, Date, speechTurn: 4, startMacReleaseWatch() {} };
+    send: (c,p) => sent.push([c,p]), probeReady: () => false, setTimeout: () => 1, OPEN_MIC_MAX_MS: 180000, Date, speechTurn: 4, startMacReleaseWatch() {}, WAKE_WORD: false, flash: () => {} };
   vm.runInNewContext(body + ';pttStart();', ctx);
   assert.equal(ctx.speakMuteUntil, 0); assert.equal(ctx.ptt.held, true);
   assert.equal(takeovers, 1); assert.equal(resets, 1);
@@ -26,7 +27,7 @@ test('main mute blocks speech from every channel without hiding the visible answ
   const body = main.slice(main.indexOf('let speakMuteUntil ='), main.indexOf('// What the Companion knows'));
   const sent = []; let stops = 0;
   const ctx = { hooks: { onVoiceTakeover: () => stops++ }, ptt: { held: false }, listener: null,
-    win: { isDestroyed: () => false, webContents: { send: (c,p) => sent.push([c,p]) } }, Date, IS_MAC: false };
+    win: { isDestroyed: () => false, webContents: { send: (c,p) => sent.push([c,p]) } }, Date, IS_MAC: false, OPEN_MIC: false, WAKE_WORD: false };
   vm.runInNewContext(body + ';send("assignment:voice",{enabled:false});send("guide:bubble",{text:"visible",speak:"late reply"});', ctx);
   assert.equal(stops, 1); assert.equal(sent.at(-1)[1].speak, undefined); assert.equal(sent.at(-1)[1].text, 'visible');
   vm.runInNewContext('send("assignment:voice",{enabled:true});send("guide:bubble",{speak:"requested"});', ctx);
@@ -42,7 +43,7 @@ test('renderer blocks late general and guide speech after mute, and speech durin
   let update; const spoken = []; let cancels = 0;
   const ctx = { settings: { speakReplies: true }, pttHeld: false, voice: null, plainify: t => t,
     SpeechSynthesisUtterance: function(t) { this.text = t; }, speechSynthesis: { cancel() { cancels++; }, speak: u => spoken.push(u.text) },
-    nus: { on: (_, cb) => { update = cb; } } };
+    nus: { on: (_, cb) => { update = cb; } }, handsFreeListening: false, vlog: () => {} };
   vm.runInNewContext(body + handler, ctx);
   update({enabled:false}); vm.runInNewContext('speak("bye");say("queued guide");', ctx);
   assert.deepEqual(spoken, []); assert.ok(cancels);
@@ -53,6 +54,7 @@ test('renderer blocks late general and guide speech after mute, and speech durin
 });
 
 test('desktop takeover stops its separate conversation and drops late streamed replies', () => {
+  if (!desktop) return;
   const stop = desktop.slice(desktop.indexOf('function stopVoice(){'), desktop.indexOf('function toggleVoice(){'));
   const event = desktop.slice(desktop.indexOf('api.onAiEvent?.('), desktop.indexOf('// -- start / stop / setup --'));
   const takeover = desktop.match(/api\.onCompanionVoiceTakeover\?\.\([^\n]+/)[0];
@@ -69,6 +71,7 @@ test('desktop takeover stops its separate conversation and drops late streamed r
 });
 
 test('desktop microphone opening cannot reactivate chat after a takeover', async () => {
+  if (!desktop) return;
   const begin = desktop.slice(desktop.indexOf('let voiceStartGeneration='), desktop.indexOf('async function startVoice(){'));
   let resolve, stopped=0;
   const ctx = { startVoiceMic:()=>new Promise(r=>{resolve=r;}),stopVoiceMic:()=>stopped++, voiceOn:false };

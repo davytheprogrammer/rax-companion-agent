@@ -182,7 +182,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       const ms = Number.isFinite(Number(args.duration_ms)) && args.duration_ms != null ? Math.max(0, Math.min(1000, Math.round(Number(args.duration_ms)))) : 250;
       const r = await hands.request('mouse.move', { x: t.point.x, y: t.point.y, durationMs: ms }, 3000);
       if (!r || !r.ok) return { ok: false, report: 'the pointer could not be moved' };
-      return { ok: true, report: 'moved the pointer' + (t.name ? ' to "' + clip(t.name, 60) + '"' : ' to that spot') + '; check for any hover menu', lookAfter: 400, settle: 700, giveUp: 300 };
+      return { ok: true, report: 'moved the pointer' + (t.name ? ' to "' + clip(t.name, 60) + '"' : ' to that spot') + '; check for any hover menu', lookAfter: 40, settle: 350, giveUp: 180 };
     },
 
     async window_minimize(args, ctx) { return windowShow('minimize', ctx); },
@@ -218,7 +218,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       // Settle caps trimmed 2026-10-29: in the ledger a Hands step spent about
       // 1.4 s outside the model, most of it waiting on screens that had already
       // settled (click 2500/1000, keys 2000/900, page 3000/1500 before).
-      return { ok: true, report: 'clicked ' + (t.name ? '"' + clip(t.name, 60) + '"' : 'at that spot'), target: t, lookAfter: 150, settle: 1500, giveUp: 600 };
+      return { ok: true, report: 'clicked ' + (t.name ? '"' + clip(t.name, 60) + '"' : 'at that spot'), target: t, lookAfter: 40, settle: 1500, giveUp: 600 };
     },
 
     async type(args, ctx) {
@@ -258,7 +258,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       const where = landed(r) || (target && target.name ? ' into "' + clip(target.name, 40) + '"' : '');
       const check = r.verified === true ? '; the box shows it' : r.verified === false ? '; but the box does not show it' + (args.submit ? ', so Enter was not pressed' : '') + ': look, then try another way' : '; could not read the box back, check the screen before saying done';
       const unverified = r.verified !== true;
-      return { ok: true, report: 'typed ' + Math.min(text.length, MAX_TEXT) + ' characters' + where + (args.submit && r.submitted !== false ? ' and pressed Enter' : '') + check, target, unverified, lookAfter: 350, settle: args.submit ? 2500 : 1000, giveUp: args.submit ? 1000 : 700 };
+      return { ok: true, report: 'typed ' + Math.min(text.length, MAX_TEXT) + ' characters' + where + (args.submit && r.submitted !== false ? ' and pressed Enter' : '') + check, target, unverified, lookAfter: 300, settle: args.submit ? 2000 : 1000, giveUp: args.submit ? 600 : 400 };
     },
 
     async press(args, ctx) {
@@ -269,7 +269,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       { const f = await focusedField(); if (f && f.rect && pointAt) { try { pointAt(f.rect, { instruction: 'Pressing ' + clip(args.keys, 20) }); await sleep(settleThread || 250); } catch (_) { /* courtesy */ } } }
       const r = await hands.request('keys.press', Object.assign({ keys: vks }, keyTarget(ctx)), 3000);
       if (!r || !r.ok) return { ok: false, report: 'that key did not go through' + (r && r.error ? ': ' + r.error : '') };
-      return { ok: true, report: 'pressed ' + clip(args.keys, 30) + (r.window ? ' in "' + clip(r.window, 60) + '"' : ''), lookAfter: 150, settle: 1500, giveUp: 600 };
+      return { ok: true, report: 'pressed ' + clip(args.keys, 30) + (r.window ? ' in "' + clip(r.window, 60) + '"' : ''), lookAfter: 40, settle: 600, giveUp: 300 };
     },
 
     async scroll(args, ctx) {
@@ -285,7 +285,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       const dx = dir === 'right' ? -ticks : dir === 'left' ? ticks : 0;
       const r = await hands.request('mouse.scroll', { x: at.x, y: at.y, dy, dx }, 3000);
       if (!r || !r.ok) return { ok: false, report: 'the scroll did not go through' };
-      return { ok: true, report: 'scrolled ' + dir + ' ' + pages + (pages === 1 ? ' page' : ' pages'), lookAfter: 250, settle: 1200 };
+      return { ok: true, report: 'scrolled ' + dir + ' ' + pages + (pages === 1 ? ' page' : ' pages'), lookAfter: 50, settle: 500 };
     },
 
     async drag(args, ctx) {
@@ -295,7 +295,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       if (pointAt) { try { pointAt(to.rect, { instruction: 'Dragging to ' + (to.name ? '"' + clip(to.name, 40) + '"' : 'here') }); await sleep(settleThread || 250); } catch (_) { /* courtesy */ } }
       const r = await hands.request('mouse.drag', { x0: from.point.x, y0: from.point.y, x1: to.point.x, y1: to.point.y }, 6000);
       if (!r || !r.ok) return { ok: false, report: 'the drag did not go through' };
-      return { ok: true, report: 'dragged ' + (from.name ? '"' + clip(from.name, 30) + '"' : 'it') + ' to ' + (to.name ? '"' + clip(to.name, 30) + '"' : 'the spot'), toName: to.name, lookAfter: 200, settle: 2000 };
+      return { ok: true, report: 'dragged ' + (from.name ? '"' + clip(from.name, 30) + '"' : 'it') + ' to ' + (to.name ? '"' + clip(to.name, 30) + '"' : 'the spot'), toName: to.name, lookAfter: 60, settle: 800 };
     },
 
     async open_app(args, ctx) {
@@ -317,8 +317,8 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       // its window is in front and make it the window the next keys go to.
       const fg = await awaitFront(hit, activated ? 2500 : APP_FRONT_MS, ctx);
       ctx.target = { name: hit.name };
-      if (fg) { ctx.fg = fg; await pointWindow(fg, hit.name); return { ok: true, report: hit.name + ' is in front' + (fg.title ? ' ("' + clip(fg.title, 50) + '")' : ''), lookAfter: 150, settle: activated ? 600 : 1500, giveUp: 500 }; }
-      return { ok: true, report: how + ' ' + hit.name + ', but its window is not in front yet; take a look before typing into it', lookAfter: 400, settle: 2500, giveUp: 1500 };
+      if (fg) { ctx.fg = fg; await pointWindow(fg, hit.name); return { ok: true, report: hit.name + ' is in front' + (fg.title ? ' ("' + clip(fg.title, 50) + '")' : ''), lookAfter: 50, settle: activated ? 350 : 800, giveUp: 300 }; }
+      return { ok: true, report: how + ' ' + hit.name + ', but its window is not in front yet; take a look before typing into it', lookAfter: 100, settle: 1200, giveUp: 600 };
     },
 
     async open_url(args, ctx) {
@@ -343,8 +343,8 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       const target = await browserTarget(named);
       ctx.target = target;
       const fg = await awaitFront(target, APP_FRONT_MS, ctx);
-      if (fg) { ctx.fg = fg; await pointWindow(fg, target.name); return { ok: true, report: 'opened ' + clip(url, 80) + ' in ' + where + '; ' + (fg.title ? '"' + clip(fg.title, 50) + '" is in front' : 'it is in front'), lookAfter: 500, settle: 2200, giveUp: 900 }; }
-      return { ok: true, report: 'opened ' + clip(url, 80) + ' in ' + where + ', but the browser window is not in front; do not type yet: take a look, or open_app the browser', lookAfter: 400, settle: 2500, giveUp: 1500 };
+      if (fg) { ctx.fg = fg; await pointWindow(fg, target.name); return { ok: true, report: 'opened ' + clip(url, 80) + ' in ' + where + '; ' + (fg.title ? '"' + clip(fg.title, 50) + '" is in front' : 'it is in front'), lookAfter: 100, settle: 1000, giveUp: 450 }; }
+      return { ok: true, report: 'opened ' + clip(url, 80) + ' in ' + where + ', but the browser window is not in front; do not type yet: take a look, or open_app the browser', lookAfter: 100, settle: 1200, giveUp: 600 };
     },
 
     async web_search(args, ctx) {
@@ -368,7 +368,7 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
       if (!hit) return { ok: false, report: 'no file number ' + args.index + ' in the last search' };
       const err = await openPath(hit.path);
       if (err) return { ok: false, report: 'could not open it: ' + clip(err, 80) };
-      return { ok: true, report: 'opened ' + hit.name, lookAfter: 800, settle: 4000 };
+      return { ok: true, report: 'opened ' + hit.name, lookAfter: 150, settle: 1500 };
     },
 
     async wait(args) {
@@ -378,6 +378,227 @@ function createActions({ probe, hands, shell, pointAt, settleThread, launchApp, 
     },
 
     async look() { return { ok: true, report: 'took a fresh look', lookAfter: 0, settle: 0 }; },
+
+    async run_command(args) {
+      const cmd = String(args.command || '').trim();
+      if (!cmd) return { ok: false, report: 'no command specified' };
+      const { exec } = require('child_process');
+      const timeoutMs = Math.max(1000, Math.min(30000, Number(args.timeout_ms) || 15000));
+      return new Promise((resolve) => {
+        exec(cmd, { timeout: timeoutMs, windowsHide: true }, (err, stdout, stderr) => {
+          const out = String(stdout || '').trim();
+          const errout = String(stderr || '').trim();
+          if (err) {
+            return resolve({
+              ok: false,
+              report: 'command exited with error: ' + clip(err.message, 120) + (errout ? ' - ' + clip(errout, 200) : ''),
+              content: (out + '\n' + errout).trim().slice(0, 10000),
+              noLook: true
+            });
+          }
+          return resolve({
+            ok: true,
+            report: 'command executed successfully' + (out ? ': ' + clip(out, 100) : ''),
+            content: (out || errout || 'ok').slice(0, 10000),
+            noLook: true
+          });
+        });
+      });
+    },
+
+    async get_clipboard() {
+      try {
+        const { clipboard } = require('electron');
+        const text = clipboard.readText();
+        return { ok: true, report: 'read ' + text.length + ' characters from clipboard', content: text.slice(0, 10000), noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'could not read clipboard: ' + clip(e.message, 80) };
+      }
+    },
+
+    async set_clipboard(args) {
+      try {
+        const text = String(args.text || '');
+        const { clipboard } = require('electron');
+        if (args.restoreAfterMs && Number(args.restoreAfterMs) > 0) {
+          const prev = clipboard.readText();
+          clipboard.writeText(text);
+          setTimeout(() => {
+            try { clipboard.writeText(prev); } catch (_) {}
+          }, Number(args.restoreAfterMs));
+          return { ok: true, report: 'copied ' + text.length + ' characters to clipboard (will restore in ' + args.restoreAfterMs + 'ms)', noLook: true };
+        }
+        clipboard.writeText(text);
+        return { ok: true, report: 'copied ' + text.length + ' characters to clipboard', noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'could not write clipboard: ' + clip(e.message, 80) };
+      }
+    },
+
+    async release_modifiers() {
+      try {
+        await hands.request('keys.release_modifiers', {}, 1000);
+        return { ok: true, report: 'released modifier keys', noLook: true };
+      } catch (_) {
+        return { ok: false, report: 'could not release modifier keys', noLook: true };
+      }
+    },
+
+    async paste_text(args, ctx) {
+      try {
+        const text = String(args.text || '');
+        if (!text) return { ok: false, report: 'nothing to paste' };
+        const { clipboard } = require('electron');
+        const prev = clipboard.readText();
+        clipboard.writeText(text);
+        const r = await hands.request('keys.press', Object.assign({ keys: [VK.ctrl, VK.v] }, keyTarget(ctx)), 2000);
+        setTimeout(() => {
+          try { clipboard.writeText(prev); } catch (_) {}
+        }, 300);
+        const ok = !!(r && r.ok);
+        return { ok, report: ok ? 'pasted ' + text.length + ' characters (clipboard preserved)' : 'could not paste into target window', lookAfter: 200, settle: 800 };
+      } catch (e) {
+        return { ok: false, report: 'could not paste text: ' + clip(e.message, 80) };
+      }
+    },
+
+    async switch_window(args, ctx) {
+      const name = String(args.name || '').trim();
+      if (!name) return { ok: false, report: 'which window?' };
+      try {
+        const a = await hands.request('win.activate', { name }, 3000);
+        if (a && a.ok) {
+          if (ctx) ctx.target = { name };
+          return { ok: true, report: 'switched to window "' + clip(name, 50) + '"', lookAfter: 200, settle: 1000 };
+        }
+      } catch (_) {}
+      return { ok: false, report: 'could not find or switch to window "' + clip(name, 50) + '"' };
+    },
+
+    async read_file(args) {
+      const fs = require('fs');
+      const p = String(args.path || '').trim();
+      if (!p) return { ok: false, report: 'no path specified' };
+      try {
+        if (!fs.existsSync(p)) return { ok: false, report: 'file not found: ' + clip(p, 80) };
+        const stat = fs.statSync(p);
+        if (stat.isDirectory()) return { ok: false, report: clip(p, 80) + ' is a directory; use list_directory instead' };
+        const content = fs.readFileSync(p, 'utf8');
+        return { ok: true, report: 'read ' + content.length + ' characters from ' + path.basename(p), content: content.slice(0, 20000), noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'failed to read file: ' + clip(e.message, 100) };
+      }
+    },
+
+    async write_file(args) {
+      const fs = require('fs');
+      const p = String(args.path || '').trim();
+      if (!p) return { ok: false, report: 'no path specified' };
+      const content = String(args.content != null ? args.content : '');
+      const append = Boolean(args.append);
+      try {
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        if (append) {
+          fs.appendFileSync(p, content, 'utf8');
+        } else {
+          fs.writeFileSync(p, content, 'utf8');
+        }
+        return { ok: true, report: (append ? 'appended to ' : 'wrote ') + path.basename(p) + ' (' + content.length + ' characters)', noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'failed to write file: ' + clip(e.message, 100) };
+      }
+    },
+
+    async list_directory(args) {
+      const fs = require('fs');
+      const p = String(args.path || '.').trim();
+      try {
+        if (!fs.existsSync(p)) return { ok: false, report: 'directory not found: ' + clip(p, 80) };
+        const entries = fs.readdirSync(p, { withFileTypes: true });
+        const list = entries.slice(0, 50).map(e => (e.isDirectory() ? '[DIR] ' : '') + e.name);
+        return { ok: true, report: 'found ' + entries.length + ' items in ' + (path.basename(p) || p), content: list.join('\n'), noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'failed to list directory: ' + clip(e.message, 100) };
+      }
+    },
+
+    async http_request(args) {
+      let url = String(args.url || '').trim();
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      const method = String(args.method || 'GET').toUpperCase();
+      try {
+        const fetchOpts = { method, headers: Object.assign({}, args.headers || {}) };
+        if (args.body && method !== 'GET') {
+          fetchOpts.body = typeof args.body === 'object' ? JSON.stringify(args.body) : String(args.body);
+          if (!fetchOpts.headers['Content-Type']) fetchOpts.headers['Content-Type'] = 'application/json';
+        }
+        const res = await fetch(url, fetchOpts);
+        const text = await res.text();
+        return { ok: res.ok, report: 'HTTP ' + res.status + ' from ' + clip(url, 60) + ' (' + text.length + ' chars)', content: text.slice(0, 15000), noLook: true };
+      } catch (e) {
+        return { ok: false, report: 'HTTP request failed: ' + clip(e.message, 100) };
+      }
+    },
+
+    async get_system_info() {
+      const os = require('os');
+      const totalMemGb = (os.totalmem() / 1e9).toFixed(1);
+      const freeMemGb = (os.freemem() / 1e9).toFixed(1);
+      const cpus = os.cpus();
+      const cpuModel = cpus && cpus.length ? cpus[0].model : 'CPU';
+      const info = {
+        platform: os.platform(),
+        release: os.release(),
+        cpu: cpuModel + ' (' + (cpus ? cpus.length : 0) + ' cores)',
+        memory: freeMemGb + ' GB free of ' + totalMemGb + ' GB',
+        uptime_hours: (os.uptime() / 3600).toFixed(1),
+        user: os.userInfo ? os.userInfo().username : 'user',
+      };
+      return { ok: true, report: 'System: ' + info.cpu + ', ' + info.memory, content: JSON.stringify(info, null, 2), noLook: true };
+    },
+
+    async list_processes() {
+      const { exec } = require('child_process');
+      return new Promise((resolve) => {
+        exec('tasklist /FO CSV /NH', { windowsHide: true }, (err, stdout) => {
+          if (err) return resolve({ ok: false, report: 'could not list processes: ' + clip(err.message, 100) });
+          const lines = String(stdout || '').split('\n').filter(Boolean);
+          const procs = lines.slice(0, 40).map(l => {
+            const parts = l.split('","').map(s => s.replace(/^"|"$/g, ''));
+            return parts[0] + ' (PID: ' + parts[1] + ', Mem: ' + (parts[4] || '') + ')';
+          });
+          return resolve({ ok: true, report: 'retrieved ' + lines.length + ' running processes', content: procs.join('\n'), noLook: true });
+        });
+      });
+    },
+
+    async kill_process(args) {
+      const target = String(args.name || args.pid || '').trim();
+      if (!target) return { ok: false, report: 'no process name or PID specified' };
+      const { exec } = require('child_process');
+      const cmd = /^\d+$/.test(target) ? 'taskkill /F /PID ' + target : 'taskkill /F /IM "' + target + (target.endsWith('.exe') ? '' : '.exe') + '"';
+      return new Promise((resolve) => {
+        exec(cmd, { windowsHide: true }, (err, stdout, stderr) => {
+          if (err) return resolve({ ok: false, report: 'failed to kill ' + target + ': ' + clip(stderr || err.message, 100) });
+          return resolve({ ok: true, report: 'terminated ' + target, noLook: true });
+        });
+      });
+    },
+
+    async show_notification(args) {
+      try {
+        const { Notification } = require('electron');
+        if (Notification && Notification.isSupported && Notification.isSupported()) {
+          const n = new Notification({
+            title: String(args.title || 'Rax'),
+            body: String(args.body || ''),
+          });
+          n.show();
+          return { ok: true, report: 'displayed desktop notification', noLook: true };
+        }
+      } catch (_) {}
+      return { ok: true, report: 'notification sent: ' + clip(args.title || args.body || '', 60), noLook: true };
+    },
   };
 
   async function windowShow(mode, ctx) {

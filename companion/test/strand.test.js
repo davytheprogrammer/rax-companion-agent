@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8');
+const read = (...p) => fs.readFileSync(path.join(root, ...p), 'utf8').replace(/\r\n/g, '\n');
 const html = read('renderer', 'index.html');
 const css = read('renderer', 'styles.css');
 const look = read('renderer', 'knot-look.css');

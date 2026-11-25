@@ -8,9 +8,10 @@ test('actual listener routes early voice commands while assignment, selection an
   const body = source.slice(source.indexOf('function getListener()'), source.indexOf('function flash('));
   const routed = [];
   const ctx = { listener: null, app: { getPath: () => 'unused' }, console,
+    OPEN_MIC: false, WAKE_WORD: false,
     ptt: { held: true, finals: 0 }, selection: {}, state: { busy: true }, assignment: { isOn: () => true },
     earlyVoiceCommand: require('../src/guide/assignment-router').earlyVoiceCommand,
-    createListener: options => options, getParakeet: () => null, routeUtterance: (...args) => routed.push(args), heardSegment: () => {}, showHeard: () => {} };
+    createListener: options => options, getParakeet: () => null, getMuseEngine: () => null, routeUtterance: (...args) => routed.push(args), heardSegment: () => {}, showHeard: () => {} };
   vm.runInNewContext(body + '; getListener();', ctx);
   assert.equal(ctx.listener.onCommand('voice mode', {seg:1}), false);
   assert.equal(ctx.listener.onCommand('voice mode off', {seg:1,heardAt:123}), true);

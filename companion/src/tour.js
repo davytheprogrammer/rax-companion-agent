@@ -12,14 +12,10 @@
 // Pure Node, no Electron: main (companion/index.js) runs the steps and owns
 // the preferences; this file holds the words and the small rules.
 
-// The 0.1.15 order. The capabilities-first order waits for the reworked tour
-// in a later release (its card 5 could not be passed with Claude Code signed out).
+// The capabilities-first order: keys first, so Meta Muse and the brain are configured from step 1.
 // hello (0) comes before the counted cards, on a first run only: the Knot has just typed into
 // Notepad (companion/src/hello.js) and asks whether to show more. Show me starts card 1.
-// No voice card (Pranav, 2026-11-11: "can we automatically equip the Fable voice? my friend agrees
-// the added step of the voice creates more friction"). Fable downloads by itself right after sign-in
-// (companion/index.js, voiceAutoEquip) and the Knot speaks with it from the next sentence on.
-const STEP = { hello: 0, mic: 1, key: 2, questions: 3, home: 4, sharing: 5, ai: 6, guide: 7, hands: 8, dashboard: 9, done: 10 };
+const STEP = { hello: 0, ai: 1, mic: 2, key: 3, questions: 4, home: 5, sharing: 6, guide: 7, hands: 8, dashboard: 9, done: 10 };
 const OF = 10;
 const { geminiKeyShape } = require('./get-started');
 const QUESTIONS = [
@@ -123,8 +119,11 @@ function nameFrom(text) {
 function keyCheck(text) {
   const t = String(text || '').trim().replace(/^["']|["']$/g, '');
   if (/^sk-ant-/i.test(t)) return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(t) ? { kind: 'anthropic', key: t, message: '' } : { kind: '', key: t, message: 'That key looks cut off. Copy the whole key again.' };
+  if (/^sk-[A-Za-z0-9_-]{20,}$/.test(t)) return { kind: 'openai', key: t, message: '' };
+  if (/^(?:meta|muse|mm)[-_][A-Za-z0-9_-]{10,}$/i.test(t)) return { kind: 'meta', key: t, message: '' };
   const shape = geminiKeyShape(t);
   if (shape.ok) return { kind: 'gemini', key: shape.key, message: '' };
+  if (/^[A-Za-z0-9_.-]{30,}$/.test(t)) return { kind: 'meta', key: t, message: '' };
   return { kind: '', key: t, message: /cut off/.test(shape.message) ? shape.message : KEY_BAD_LINE };
 }
 
@@ -210,12 +209,10 @@ function card(step, info = {}) {
   if (step === STEP.home) return Object.assign(base, { kind: 'home', title: 'Where should I live?', body: 'Free, I sit where you put me and you can drag me anywhere. In the island bar I dock at the top of the screen and my words run along it. Tap one and watch.', spoken: 'Where should I live? Tap one and watch me move.', choices: homeChoices(caps.island), status: '', actions: continueActions(false) });
   if (step === STEP.sharing) return Object.assign(base, { kind: 'sharing', title: 'On a call or a recording', body: 'Off, people on your call see me too. On, I am invisible in screen shares and recordings, so only you see me.', spoken: 'On a call, I can stay out of the picture. Your choice.', toggle: sharingToggle(caps), note: caps.captureForcedOff ? 'Turned off for this session by its settings.' : '', status: '', actions: continueActions(false) });
   if (step === STEP.ai) {
-    // publik answers (picked on the sign-in screens): nothing to paste here.
     if (caps.publik) return Object.assign(base, { kind: 'ai', title: 'Who answers', body: PUBLIK_BODY, spoken: 'publik answers for you. No key to paste.', note: 'To use your own key instead: the dashboard, under Settings, Keys.', status: '', actions: continueActions(false) });
-    if (caps.cli) return Object.assign(base, { kind: 'ai', title: 'Who answers', body: 'Claude Code is installed on this computer. If it is signed in, I use it to answer and to point, with no key at all.', spoken: 'Claude Code is here, so I can answer with no key.', note: 'A Gemini or Anthropic key can go on the dashboard, under Settings, Keys.', status: '', actions: continueActions(false) });
-    if (caps.keyReady) return Object.assign(base, { kind: 'ai', title: 'Who answers', body: 'An AI key is saved already. I use it to answer and to point.', spoken: 'Your AI key is saved. I can answer and point.', note: 'Keys live on the dashboard, under Settings, Keys.', status: '', actions: continueActions(false) });
-    return Object.assign(base, { kind: 'ai', title: 'Who answers', body: 'Paste a free Gemini key, or an Anthropic key. It stays on this device, encrypted. You can add or change it any time on the dashboard, under Settings, Keys.', spoken: 'Who answers your questions? Paste a key here, or later on the dashboard.',
-      input: { action: 'tour-key', placeholder: 'Gemini or Anthropic key', label: 'Save', secret: true }, status: '', actions: [{ id: 'tour-next', label: 'Later' }] });
+    if (caps.keyReady || caps.cli) return Object.assign(base, { kind: 'ai', title: caps.cli ? 'Who answers' : 'Your keys are connected', body: caps.cli ? 'Claude Code is installed on this PC and ready to answer. You can use it or paste an API key.' : 'Your Meta Muse voice key and AI keys are active. Rax will use Muse for speech-to-text and hands-free control.', spoken: caps.cli ? 'Claude Code is installed and ready.' : 'Your keys are connected. Muse will handle your voice.', note: 'Manage keys anytime on the dashboard, under Settings, Keys.', status: '', actions: continueActions(false) });
+    return Object.assign(base, { kind: 'ai', title: 'Connect your Voice & AI keys', body: 'Paste your Meta Muse API key for high-accuracy speech-to-text, or an AI model key (OpenAI, Gemini, or Claude). Muse powers hands-free voice recognition so Rax hears you immediately.', spoken: 'First, paste your Meta Muse key for voice, or your AI key. They stay on this device, encrypted.',
+      input: { action: 'tour-key', placeholder: 'Meta Muse key, OpenAI, Gemini, or Claude key', label: 'Save', secret: true }, status: '', actions: [{ id: 'tour-next', label: 'Later' }] });
   }
   if (step === STEP.guide) {
     if (caps.source && caps.macTyped) return Object.assign(base, { kind: 'guide', title: 'I see what you see', body: 'Click me and type a question about the window behind this card.', spoken: 'Click me and type a question about the window behind this card.', chip: GUIDE_CHIP_ANY, status: '', actions: continueActions(true) });

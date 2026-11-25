@@ -9,10 +9,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
-const main = fs.readFileSync(path.join(root, 'index.js'), 'utf8');
-const js = fs.readFileSync(path.join(root, 'renderer', 'renderer.js'), 'utf8');
-const css = fs.readFileSync(path.join(root, 'renderer', 'styles.css'), 'utf8');
-const preload = fs.readFileSync(path.join(root, 'preload.js'), 'utf8');
+const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
+const main = read(path.join(root, 'index.js'));
+const js = read(path.join(root, 'renderer', 'renderer.js'));
+const css = read(path.join(root, 'renderer', 'styles.css'));
+const preload = read(path.join(root, 'preload.js'));
 const { validatePoint, SYSTEM } = require('../src/guide/pointing');
 const { reconcile } = require('../src/guide/verify');
 
@@ -65,8 +66,9 @@ test('a question about the selection is answered at the thread tip and can becom
 });
 
 test('guide steps through the Claude Code fallback ask for the fast model', () => {
-  const ai = fs.readFileSync(path.join(root, '..', 'src', 'ai.js'), 'utf8');
-  const desktop = fs.readFileSync(path.join(root, '..', 'src', 'main.js'), 'utf8');
+  const ai = read(path.join(root, '..', 'src', 'ai.js'));
+  const desktopPath = fs.existsSync(path.join(root, '..', 'src', 'main.js')) ? path.join(root, '..', 'src', 'main.js') : path.join(root, '..', 'src', 'main-companion.js');
+  const desktop = read(desktopPath);
   // Not Haiku: measured 2026-09-15 it pads its JSON with prose and is 4x slower.
   assert.match(main, /const GUIDE_FAST_MODEL = process\.env\.NUS_GUIDE_MODEL \|\| 'claude-sonnet-5';/);
   // The screenshot rides as an image block and the system prompt stays separate
@@ -76,7 +78,7 @@ test('guide steps through the Claude Code fallback ask for the fast model', () =
   assert.match(ai, /opts && opts\.image\) content\.push\(\{ type: 'image', dataUrl: opts\.image \}\)/);
   assert.match(ai, /FAST_CLI_ARGS = \['--strict-mcp-config', '--no-session-persistence', '--tools', 'Read', '--effort', 'low'\]/);
   assert.doesNotMatch(ai, /'--bare'/, 'bare mode skips the keychain and lands signed out');
-  assert.match(desktop, /desktopComplete: \(prompt, opts\) => ai\.complete\(prompt, opts\),/);
+  assert.match(desktop, /desktopComplete:\s*\(p(?:rompt)?,(?:\s*)o(?:pts)?\)\s*=>\s*ai\.complete/);
   assert.match(ai, /async function complete\(prompt, opts = \{\}\)/);
   assert.match(ai, /'--model', model \|\| MODEL/, 'other callers keep the pinned default');
 });

@@ -18,7 +18,7 @@ const { createHandsExecutor } = require('../src/tasks/executors/hands');
 const { createProjects, parseProjectAsk, claimedWithListOff, hasSavedProject, LIST_OFF_LINE, askToKeep, isNoted, notedLine, scrubTyped, cleanUrl, cleanSources, matchWindows, contextFor, resumeRequest, isFinished, finishedLine, summaryLine, nextStepFor } = require('../src/tasks/projects');
 
 const root = path.resolve(__dirname, '..', '..');
-const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'nus-projects-')); }
 const tick = () => new Promise((r) => setImmediate(r));
 async function settle(n = 14) { for (let i = 0; i < n; i++) await tick(); }

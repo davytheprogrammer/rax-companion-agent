@@ -33,7 +33,7 @@ const { createFastPointer } = require('./src/guide/fastpoint');
 const { hedged } = require('./src/guide/hedge');
 const { createProactive } = require('./src/proactive');
 const { cleanTranscript, classifyUtterance } = require('./src/guide/voice');
-const { parseWake, isVoiceSource, WAKE_SOURCE, ARMED_MS } = require('./src/handsfree/wake');
+const { parseWake, isEmergencyStop, isVoiceSource, WAKE_SOURCE, ARMED_MS } = require('./src/handsfree/wake');
 const { bitmapHash } = require('./src/guide/verify');
 const { parsePointReply } = require('./src/guide/pointing');
 const { captureDisplay } = require('./src/screen');
@@ -1679,11 +1679,13 @@ function applySettingsPatch(patch) {
   // The speech model switch: off lets its memory go at once.
   if (patch && Object.prototype.hasOwnProperty.call(patch, 'speechModel')) { try { getParakeet().settingChanged(); } catch (_) { /* whisper answers */ } }
   jev.configure({ apiKey: s.apiKeys && s.apiKeys.typesafe });
+  if (patch && patch.apiKeys) listener = null; // hot-reload ears with updated Meta Muse engine
   if (STANDALONE) {
     const nextOpenMic = s.openMic ?? (process.env.NUS_REFLEX_OPENMIC === '1');
     if ((nextOpenMic !== OPEN_MIC || Boolean(s.wakeWord) !== WAKE_WORD) && ptt.held) pttStop('settings');
     OPEN_MIC = nextOpenMic;
     WAKE_WORD = Boolean(s.wakeWord);
+    clearTimeout(wakeArmedTimer);
     wakeArmedUntil = 0;
     if (patch.knotCorner) send('knot:corner', { corner: s.knotCorner });
     if (Object.prototype.hasOwnProperty.call(patch, 'knotDisplayId')) reboundOverlay();
@@ -1768,15 +1770,20 @@ function registerIpc() {
   companionIpc.on('companion:ask', (_e, payload) => runFeature(payload.mode, payload.text));
   companionIpc.on('companion:mic:pcm', (_e, arrayBuffer) => { if (state.capturing) buffers.you.push(Buffer.from(arrayBuffer)); });
   companionIpc.on('companion:ptt:pcm', (_e, arrayBuffer) => {
-    if (!ptt.held) return;
+    if (!ptt.held && !(OPEN_MIC && WAKE_WORD)) return;
     const buf = Buffer.from(arrayBuffer);
-    if (!ptt.streaming || !OPEN_MIC) ptt.chunks.push(buf);
-    if (ptt.streaming && !rendererSpeaking && Date.now() > speakMuteUntil) getListener().push(buf);
+    if (ptt.held && (!ptt.streaming || !OPEN_MIC)) ptt.chunks.push(buf);
+    if ((ptt.streaming || (OPEN_MIC && WAKE_WORD)) && !rendererSpeaking && Date.now() > speakMuteUntil) {
+      getListener().push(buf);
+    }
   });
   companionIpc.on('companion:voice:activity', (_e, active) => {
     rendererSpeaking = active === true;
     if (rendererSpeaking && listener) listener.reset();
-    if (!rendererSpeaking) speakMuteUntil = Date.now() + 500;
+    if (!rendererSpeaking) {
+      // Audio playback finished: clamp muting tail to 250ms room reverb, clearing any long character-based estimates
+      speakMuteUntil = Date.now() + 250;
+    }
   });
   companionIpc.on('companion:system:pcm', (_e, arrayBuffer) => { if (state.capturing) buffers.them.push(Buffer.from(arrayBuffer)); });
   companionIpc.on('companion:mouse:ignore', (_e, v, why) => {
@@ -2326,8 +2333,8 @@ const FORCE_CLAUDE_GUIDE = process.env.NUS_GUIDE_PROVIDER === 'claude';
 // sees it) and far above Gemini's 768 px tiles, so the old 2560 px PNG bought
 // no accuracy, only a multi-MB upload and a main-thread encode. The worker
 // produces a JPEG at this size (src/guide/capture-model.js).
-const GUIDE_CAPTURE_MAXSIDE = Number(process.env.NUS_GUIDE_MAXSIDE) || 1568;
-const GUIDE_CAPTURE_QUALITY = Number(process.env.NUS_GUIDE_JPEG_QUALITY) || 80;
+const GUIDE_CAPTURE_MAXSIDE = Number(process.env.NUS_GUIDE_MAXSIDE) || 1280;
+const GUIDE_CAPTURE_QUALITY = Number(process.env.NUS_GUIDE_JPEG_QUALITY) || 72;
 // A stuck or overloaded call must not be the whole wait: after GUIDE_HEDGE_MS
 // the same request goes out again and the first good answer wins (src/guide/
 // hedge.js). Only on a real stall (9 s), once, and never after a quota error: the
@@ -2567,7 +2574,7 @@ async function handsRead() {
   // Alt+Tab's own "Task Switching" window is never the app: wait it out.
   for (let i = 0; i < 3 && isSwitcher(fg); i++) { await new Promise((r) => setTimeout(r, 350)); fg = await getGuide().foreground(); }
   let list = null;
-  const listP = probeReady() && fg && fg.hwnd ? probe.request('uia.list', { hwnd: fg.hwnd, max: 150, budgetMs: 1200 }, 3000).catch(() => null) : Promise.resolve(null);
+  const listP = probeReady() && fg && fg.hwnd ? probe.request('uia.list', { hwnd: fg.hwnd, max: 100, budgetMs: 500 }, 2000).catch(() => null) : Promise.resolve(null);
   const cap = await guideCapture();
   list = await listP;
   const originPhys = cap ? screenPoints().dipToScreen({ x: cap.display.bounds.x, y: cap.display.bounds.y }) : { x: 0, y: 0 };
@@ -2615,7 +2622,7 @@ function buildActions() {
       if (!win || win.isDestroyed()) return;
       send('guide:target', { bbox: physRectToWindow(rect), task: 'hands', step: 0, kicker: 'hands', instruction: (o && o.instruction) || '', hint: '', actions: [], sessionId: null, seq: Date.now() });
     },
-    settleThread: 300,
+    settleThread: 60,
     launchApp,
     launchBrowser: createBrowserLaunch({ execFile }),
     defaultBrowser: createDefaultBrowser({ execFile }),
@@ -3596,14 +3603,34 @@ let OPEN_MIC = process.env.NUS_REFLEX_OPENMIC === '1';
 // Hands-free: with the open mic on, only what starts with the wake word is acted on (src/handsfree/wake.js).
 let WAKE_WORD = false;
 let wakeArmedUntil = 0;
+let wakeArmedTimer = null;
 let rendererSpeaking = false;
 const OPEN_MIC_MAX_MS = 180000;
+
+function getMuseEngine() {
+  const keys = (store.getSettings && store.getSettings().apiKeys) || {};
+  const museKey = keys.meta || keys.muse || process.env.MODEL_API_KEY || process.env.META_API_KEY;
+  if (!museKey) return null;
+  return {
+    name: 'muse',
+    wanted: () => true,
+    ready: () => true,
+    budgetMs: 5000,
+    transcribe: async (pcm) => {
+      const { pcmToWav } = require('./src/wav');
+      const { transcribeMuseWav } = require('./src/voice/muse');
+      const wav = pcmToWav(pcm, 16000, 1);
+      return await transcribeMuseWav(museKey, wav, { keywords: ['Rax', 'Knot'] });
+    }
+  };
+}
 
 // Streaming ears. While the key is down (or the mic is open) speech is cut at
 // pauses and transcribed as it arrives, so a launch can fire mid-sentence.
 let listener = null;
 function getListener() {
   if (!listener) {
+    const museEngine = getMuseEngine();
     listener = createListener({
       userData: app.getPath('userData'),
       log: (m) => console.log(m),
@@ -3617,8 +3644,8 @@ function getListener() {
       onPartial: (text, meta) => { if (WAKE_WORD && OPEN_MIC) return; showHeard(text); if (ptt.heldText || heardBack(text) || selection || assignment?.isOn() || classifyAsk(text, false)) return; if (parseRecallAsk(text)) { warmRecallBrain(); return; } earlyGuideRead(text, 'voice'); if (!state.busy && !ownPath(text) && !handsClaims(text) && !handsFollowUp(text) && !(agent && agent.active())) getReflex().handle(text, { final: false, uttId: meta && meta.seg, keyed: !OPEN_MIC }).catch(() => {}); },
       // Names whisper should know: the product, and the people and courses in memory.
       vocabulary: () => whisperVocabulary(),
-      // The optional engine for finished sentences; nothing changes until it is on and loaded.
-      finalEngine: getParakeet(),
+      // The optional engine for finished sentences; Meta Muse takes precedence when set.
+      finalEngine: museEngine || getParakeet(),
       onFinal: joinFinal
     });
   }
@@ -3636,6 +3663,7 @@ function wholePressWanted(text) { return process.env.NUS_WHOLE_PRESS !== '0' && 
 // Professor Lee" saved "I take CS". A final that stops mid-phrase waits too, but
 // only about a breath for the next final, even across a release and a new press.
 const MID_PHRASE_MS = 1500;
+const FAST_MID_PHRASE_MS = 600;
 function joinFinal(text, meta) {
   if (OPEN_MIC && WAKE_WORD && !ptt.heldText && parseWake(text, { now: Date.now(), armedUntil: wakeArmedUntil }).kind === 'none') return;
   clearTimeout(ptt.midTimer); ptt.midTimer = null;
@@ -3646,18 +3674,19 @@ function joinFinal(text, meta) {
   const joined = held ? held.text + ' ' + text : text;
   const heardAt = (held && held.heardAt) || (meta && meta.heardAt);
   const press = held && held.press != null ? held.press : ptt.press;
+  const midWait = (OPEN_MIC && WAKE_WORD) ? Math.min(FAST_MID_PHRASE_MS, MID_PHRASE_MS) : MID_PHRASE_MS;
   // ptt.flushing: the key has just come up and the last words of this press are
   // still being transcribed behind this final. They are the rest of the same
   // sentence (live 2026-11-20: "Type in, I just built an app." went out alone,
   // then "That lets you type in the speed of light." went out as a second ask).
-  if (reason !== 'flush' && (ptt.held || ptt.flushing) && (carriesText(joined, { hands: handsOn() }) || handsFollowUp(joined))) { ptt.heldText = { text: joined, heardAt, seg: meta && meta.seg, press }; if (OPEN_MIC && WAKE_WORD) ptt.midTimer = setTimeout(routeHeldText, MID_PHRASE_MS); return; }
+  if (reason !== 'flush' && (ptt.held || ptt.flushing) && (carriesText(joined, { hands: handsOn() }) || handsFollowUp(joined))) { ptt.heldText = { text: joined, heardAt, seg: meta && meta.seg, press }; if (OPEN_MIC && WAKE_WORD) ptt.midTimer = setTimeout(routeHeldText, midWait); return; }
   // The key is up and these are the last words of the press. A typed line, a
   // note or a search waits a moment more: pttStop hears the whole press again
   // in one piece before it goes out (hearWholePress).
   if (reason === 'flush' && ptt.flushing && wholePressWanted(joined)) { ptt.heldText = { text: joined, heardAt, seg: meta && meta.seg, press }; return; }
   if (endsMidPhrase(joined, { keyUp: reason === 'flush' })) {
     ptt.heldText = { text: joined, heardAt, seg: meta && meta.seg, press };
-    ptt.midTimer = setTimeout(routeHeldText, MID_PHRASE_MS);
+    ptt.midTimer = setTimeout(routeHeldText, midWait);
     return;
   }
   ptt.heldText = null;
@@ -3880,6 +3909,7 @@ async function pttStop(reason) {
   const keyUpAt = Date.now();
   const press = ptt.press;
   ptt.held = false;
+  clearTimeout(wakeArmedTimer);
   wakeArmedUntil = 0;
   clearTimeout(ptt.timer);
   ptt.timer = null;
@@ -4302,7 +4332,15 @@ async function tourKey(text) {
   if (!kind) { send('tour:update', { status: shape }); return; }
   const save = (value) => (typeof hooks.tourSaveKey === 'function' ? hooks.tourSaveKey(kind, value) : applySettingsPatch({ apiKeys: { [kind]: value } }));
   save(key);
-  send('tour:update', { status: 'Checking the ' + (kind === 'gemini' ? 'Gemini' : 'Anthropic') + ' key.' });
+  if (kind === 'meta') {
+    T.caps.keyReady = true; T.caps.source = true;
+    listener = null;
+    const msg = 'Meta Muse key saved! Voice recognition is ready.';
+    send('tour:update', { status: msg, input: null, actions: Tour.continueActions(false) });
+    tourSay(msg);
+    return;
+  }
+  send('tour:update', { status: 'Checking the ' + (kind === 'gemini' ? 'Gemini' : kind === 'openai' ? 'OpenAI' : 'Anthropic') + ' key.' });
   let ok = false, message = '';
   try {
     const r = typeof hooks.tourTestKey === 'function' ? await hooks.tourTestKey(kind) : null;
@@ -4485,7 +4523,7 @@ function tourEnd(reason) {
   send('hands:state', { active: false, waiting: false });
   send('tour:end', { reason });
   if (hooks.tourPrefs) { hooks.tourPrefs.set('tour_done', true); hooks.tourPrefs.set('tour_step', 0); }
-  try { applySettingsPatch({ onboarded: true }); } catch (_) { /* a settings write never breaks the end */ }
+  try { applySettingsPatch({ onboarded: true, startWithWindows: true }); } catch (_) { /* a settings write never breaks the end */ }
   routeLog('tour ' + reason + (T.name ? ' (' + T.name + ')' : ''));
   restoreKnotState();
   tourNotifyHome();
@@ -4507,14 +4545,47 @@ function noteAiReady() {
 async function routeUtterance(text, source, heard, uttId, assignmentAlreadyChecked) {
   const heardAt = heard || Date.now();
   if (tour && tour.hear && String(text || '').trim()) { tourHeard(text, source); return; }
+  // Out-of-band Fast-Path Emergency Stop:
+  // If an autonomous task, speech playback, or the Knot is active, ANY emergency word
+  // ("stop", "cancel", "abort", "freeze", with or without the wake word) breaks immediately with zero latency.
+  const busy = (agent && agent.active()) || (guide && guide.active()) || (assignment && assignment.isOn()) || Date.now() < speakMuteUntil;
+  if (isEmergencyStop(text) && (busy || (source === 'voice' && OPEN_MIC && WAKE_WORD))) {
+    routeLog('-> EMERGENCY FAST STOP: "' + text + '"');
+    hushSpeech('voice');
+    if (agent && agent.active()) stopHands('voice');
+    if (guide && guide.active()) guide.dismiss('voice');
+    restoreKnotState();
+    send('cues:play', { name: 'hands-stop' });
+    sayShort('Stopped.', source, heardAt, 'emergency stop');
+    return;
+  }
   // Hands-free: with the open mic and the wake word on, the room is dropped unless it starts with the name.
   // The name alone arms the Knot for a few seconds. What it hears through the name is a talk-key ask (WAKE_SOURCE).
   if (source === 'voice' && OPEN_MIC && WAKE_WORD) {
     const w = parseWake(text, { now: Date.now(), armedUntil: wakeArmedUntil });
     if (w.kind === 'none') { routeLog('wake: not to the Knot, dropped'); return; }
-    if (w.kind === 'armed') { wakeArmedUntil = Date.now() + ARMED_MS; sayAck('sure', source, heardAt); return; }
+    hushSpeech('wake');
+    if (w.kind === 'armed') {
+      wakeArmedUntil = Date.now() + ARMED_MS;
+      send('cues:play', { name: 'wake' });
+      send('guide:state', { state: 'listening', task: 'wake' });
+      clearTimeout(wakeArmedTimer);
+      wakeArmedTimer = setTimeout(() => {
+        if (Date.now() >= wakeArmedUntil) {
+          restoreKnotState();
+        }
+      }, ARMED_MS);
+      if (/hello|hi|hey|good morning|good evening|yo/i.test(text)) {
+        sayShort("Hello! I'm listening.", source, heardAt, 'wake-greeting');
+      } else {
+        sayAck('sure', source, heardAt);
+      }
+      return;
+    }
+    clearTimeout(wakeArmedTimer);
     wakeArmedUntil = 0;
     text = w.text; source = WAKE_SOURCE;
+    send('cues:play', { name: 'wake' });
   }
   // The Knot's own line heard back is nobody's ask. With a card up, words answer the card.
   if (source !== 'typed' && heardBack(text) && !(agent && agent.asking())) { routeLog('heard back, nothing: "' + String(text).slice(0, 40) + '"'); restoreKnotState(); return; }
@@ -5592,6 +5663,20 @@ function initCompanion(providedHooks = {}) {
     contactStatus,
     contactGive: (email) => contactGive(email, 'home'),
     contactDecline,
+    onSuspend: () => {
+      console.log('[companion] power suspend: resetting listener and speech');
+      if (listener) { try { listener.reset(); } catch (_) {} }
+      hushSpeech('suspend');
+      send('power:suspend', {});
+    },
+    onResume: () => {
+      console.log('[companion] power resume: refreshing listener and notifying UI');
+      if (listener) { try { listener.reset(); } catch (_) {} }
+      send('power:resume', {});
+      if (OPEN_MIC && WAKE_WORD) {
+        try { getListener(); } catch (_) {}
+      }
+    },
   };
 }
 // My Rax for the dashboard (companion/src/my-nus.js): worked out here, sent nowhere.

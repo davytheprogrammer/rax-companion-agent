@@ -11,7 +11,7 @@ const H = require('../src/hello');
 const T = require('../src/tour');
 
 const ROOT = path.join(__dirname, '..', '..');
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
 // A fake desktop: Notepad comes up after `upAfter` looks; `doc` is the open document's text, or
 // null when it cannot be read; `stopAt` makes the helper stop after that many characters.
@@ -47,8 +47,8 @@ function desk(o = {}) {
 
 test('the words: GPT\'s version by default, Pranav\'s own as the other, and the corner where the Knot is', () => {
   assert.equal(H.STUNT_PICK, 'A');
-  assert.equal(H.text('A', { fx: 0.9, fy: 0.9 }), "You didn't open this.\nI did.\n\nI'm Nūs!\n\nLook at the bottom-right corner of your screen.");
-  assert.equal(H.text('B', { fx: 0.9, fy: 0.9 }), 'Welcome to Nūs. Please look at the Knot at the bottom right corner to begin');
+  assert.match(H.text('A', { fx: 0.9, fy: 0.9 }), /You didn't open this\.\nI did\.\n\nI'm (?:Nūs|Rax)!\n\nLook at the bottom-right corner of your screen\./);
+  assert.match(H.text('B', { fx: 0.9, fy: 0.9 }), /Welcome to (?:Nūs|Rax)\. Please look at the Knot at the bottom right corner to begin/);
   assert.match(H.text('A', { fx: 0.1, fy: 0.1 }), /top-left corner/);
   assert.match(H.text('A', { fx: 0.1, fy: 0.8 }), /bottom-left corner/);
   assert.match(H.text('A', { island: true }), /Look at the top of your screen\.$/);
@@ -140,8 +140,8 @@ test('the person clicks away or presses a key mid-note: it stops at once and typ
 test('the hello card: shown and spoken, the obvious button starts the tour, Not now leaves it owed', () => {
   const c = T.card(T.STEP.hello, { caps: { helloTyped: true } });
   assert.equal(T.STEP.hello, 0);
-  assert.equal(c.kind, 'hello'); assert.equal(c.title, "Hey, I'm Nūs."); assert.equal(c.body, 'That was me. Wanna see what else I can do?');
-  assert.equal(c.spoken, "Hey, I'm Nūs. That was me. Wanna see what else I can do?");
+  assert.equal(c.kind, 'hello'); assert.match(c.title, /Hey, I'm (?:Nūs|Rax)\./); assert.equal(c.body, 'That was me. Wanna see what else I can do?');
+  assert.match(c.spoken, /Hey, I'm (?:Nūs|Rax)\. That was me\. Wanna see what else I can do\?/);
   assert.deepEqual(c.actions.map((a) => [a.id, a.label, !!a.primary]), [['tour-next', 'Show me', true], ['tour-later', 'Not now', false]]);
   assert.equal(c.skip, false);
   const none = T.card(T.STEP.hello, { caps: { helloTyped: false } });

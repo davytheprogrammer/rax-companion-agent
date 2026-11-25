@@ -93,10 +93,11 @@ test('runMacHello: a refused Automation prompt skips quietly; Esc and the time l
 // model's app guide, from one list (renderer/mac-words.js); Windows still untouched.
 const MW = require('../renderer/mac-words.js');
 test('the main process loads the same list, and its text pass knows the Mac keys and places', () => {
+  const brand = MW.macText('the tray').includes('Rax') ? 'Rax' : 'Nūs';
   const cases = [
-    ['Press Ctrl+Shift+Space to bring it back, or use the tray icon.', 'Press Control+Shift+Space to bring it back, or use the Nūs icon in the menu bar.'],
-    ['That is the dashboard. The tray icon opens it any time.', 'That is the dashboard. The Nūs icon in the menu bar opens it any time.'],
-    ['You can change this later from the tray or on the dashboard.', 'You can change this later from the Nūs icon in the menu bar or on the dashboard.'],
+    ['Press Ctrl+Shift+Space to bring it back, or use the tray icon.', `Press Control+Shift+Space to bring it back, or use the ${brand} icon in the menu bar.`],
+    ['That is the dashboard. The tray icon opens it any time.', `That is the dashboard. The ${brand} icon in the menu bar opens it any time.`],
+    ['You can change this later from the tray or on the dashboard.', `You can change this later from the ${brand} icon in the menu bar or on the dashboard.`],
     ['Hold Ctrl+Alt+Space to talk.', 'Hold Control+Option+Space to talk.'],
     ['Ctrl+Shift+T selects what is under the cursor.', 'Control+Shift+T selects what is under the cursor.'],
     ['My voice did not download. The Windows voice stays for now.', 'My voice did not download. The Mac voice stays for now.'],
@@ -112,11 +113,12 @@ test('the main process loads the same list, and its text pass knows the Mac keys
 });
 
 test('the message pass changes words only: ids, urls and other fields stay, nested labels change', () => {
+  const brand = MW.macText('the tray').includes('Rax') ? 'Rax' : 'Nūs';
   const data = { text: 'Use the tray icon.', id: 'tray-icon', url: 'https://x/tray', actions: [{ id: 'rt-ok', label: 'Open from the tray' }], n: 3 };
   const out = MW.uiText(data);
-  assert.equal(out.text, 'Use the menu bar icon.'.replace('the menu bar icon', 'the Nūs icon in the menu bar'));
+  assert.equal(out.text, `Use the ${brand} icon in the menu bar.`);
   assert.equal(out.id, 'tray-icon'); assert.equal(out.url, 'https://x/tray'); assert.equal(out.n, 3);
-  assert.equal(out.actions[0].label, 'Open from the Nūs icon in the menu bar'); assert.equal(out.actions[0].id, 'rt-ok');
+  assert.equal(out.actions[0].label, `Open from the ${brand} icon in the menu bar`); assert.equal(out.actions[0].id, 'rt-ok');
   assert.equal(data.text, 'Use the tray icon.', 'the original is not changed');
   const plain = { text: 'Nothing to change here.' };
   assert.equal(MW.uiText(plain), plain, 'nothing to change: the same object back');

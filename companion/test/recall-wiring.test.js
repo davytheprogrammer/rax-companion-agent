@@ -6,7 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..', '..');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g, '\n');
 
 test('nothing from notes or chats can become a memory fact', () => {
   for (const f of fs.readdirSync(path.join(root, 'companion', 'src', 'recall'))) {
@@ -43,7 +43,7 @@ test('Home: the notes folder is a setting, imports and forget are wired, and the
   const preload = read('companion/home/preload.js');
   assert.match(preload, /'home:recall'/);
   const html = read('companion/home/index.html');
-  assert.match(html, /<h3>What Nūs knows about you<\/h3>/);
+  assert.match(html, /<h3>What (?:Nūs|Rax) knows about you<\/h3>/);
   for (const id of ['recall-counts', 'recall-vault', 'recall-import-folder', 'recall-import-file', 'recall-forget']) assert.ok(html.includes('id="' + id + '"'), id);
   assert.match(html, /Forget all imported chats/);
   const homeJs = read('companion/home/home.js');

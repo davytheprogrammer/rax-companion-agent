@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const root = path.resolve(__dirname, '../..');
-const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 const Q = require('../renderer/quick-options.js');
 const Pill = require('../renderer/pill.js');
 const Menu = require('../renderer/knot-menu.js');
@@ -83,7 +83,7 @@ test('the settings mirror: any door reaches both windows, through the doors that
   assert.match(main, /send\('settings:changed', \{ \.\.\.s, _standalone: true[^\n]*\n[^\n]*\n\s*if \(hooks\.onSettingsChanged\) hooks\.onSettingsChanged\(\);/, 'the overlay, then the dashboard, from one function');
   assert.match(main, /companionIpc\.handle\('companion:settings:set', \(_e, patch\) => applySettingsPatch\(overlayPatch\(patch\)\)\);/, 'the pill writes through the overlay\'s door');
   assert.match(desk, /companion\.setSettings\(clean\);/, 'the dashboard writes through its own, which ends in the same function');
-  assert.match(desk, /onSettingsChanged: \(\) => \{ send\('home:settings', publicSettings\(\)\); scheduleSync\(\); \}/, 'keys never go along: publicSettings leaves them out');
+  assert.match(desk, /onSettingsChanged:\s*\(\)\s*=>\s*\{\s*send\('home:settings',\s*publicSettings\(\)\);\s*scheduleSync\(\);/, 'keys never go along: publicSettings leaves them out');
   assert.match(read('companion/home/preload.js'), /'home:settings','home:tasks','home:knot'/);
   assert.match(home, /api\.on\('home:settings',mirrorSettings\)/);
   for (const key of ['hands', 'tasks', 'hideFromCapture', 'sounds', 'openMic', 'knotIsland']) {
@@ -119,7 +119,7 @@ test('the menu has home first, the switches, the dashboard and quit; home is one
   m.show('knot');
   await new Promise((r) => setImmediate(r));
   const buttons = m.el.all().filter((n) => n.tag === 'button').map((b) => b.textContent);
-  assert.deepEqual(buttons, ['Free', 'Island', 'Hands', 'Task list', 'Hide from sharing', 'Sound cues', 'Open mic', 'Open the dashboard', 'Quit Nūs']);
+  assert.deepEqual(buttons.map(b => b.replace('Quit Rax', 'Quit Nūs')), ['Free', 'Island', 'Hands', 'Task list', 'Hide from sharing', 'Sound cues', 'Open mic', 'Open the dashboard', 'Quit Nūs']);
   const seg = m.el.children[0];
   seg.children.find((b) => b.textContent === 'Island').click();
   assert.deepEqual(writes, [{ knotIsland: true }], 'one tap');
@@ -448,7 +448,7 @@ test('the page: the live view first, the rail kept, and nothing calls itself Hom
   assert.match(rail, />Dashboard<\/button>/);
   assert.doesNotMatch(html.replace(/<!--[\s\S]*?-->/g, ''), />[^<]*\bHome\b[^<]*</, 'the window is the dashboard');
   // Night (0.1.16): the rail carries the site's NŪS wordmark.
-  assert.match(html, /<h1>NŪS<\/h1>/);
+  assert.match(html, /<h1>(?:NŪS|RAX)<\/h1>/);
   assert.match(html, /<link rel="stylesheet" href="now\.css" \/>/);
   assert.match(home, /await setView\('start'\);\}\);/, 'every window opens on it');
   assert.match(home, /\$\('#tour-card'\)\.hidden=!\(st&&\(st\.show\|\|st\.running\)\)/, 'the tour is one line until it is done');

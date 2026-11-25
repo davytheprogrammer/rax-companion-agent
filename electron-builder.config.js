@@ -92,7 +92,7 @@ const config = {
     ],
     ...(azure ? {
       azureSignOptions: {
-        publisherName: 'Pranav Desu',
+        publisherName: 'Rax Team',
         endpoint: process.env.NUS_SIGN_ENDPOINT,
         codeSigningAccountName: process.env.NUS_SIGN_ACCOUNT,
         certificateProfileName: process.env.NUS_SIGN_PROFILE,

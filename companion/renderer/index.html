@@ -163,8 +163,10 @@
         <label class="s-label" data-standalone-only>TypeSafe key <span class="s-hint">for Jev, the voice-to-action layer · typesafe.ai</span></label>
         <div class="s-field" data-standalone-only><span>TypeSafe</span><input id="key-typesafe" type="password" autocomplete="off" /></div>
         <p class="s-note" data-standalone-only>Settings on the dashboard also has the live talk key, privacy choices, and speech model status.</p>
+        <label class="s-label">Meta Muse API key <span class="s-hint">Primary AI Responder & Voice STT · stored locally and encrypted</span></label>
+        <div class="s-field"><span>Meta Muse</span><input id="key-meta" type="password" placeholder="meta-... or apiKey" autocomplete="off" /></div>
         <label class="s-label">Gemini API key <span class="s-hint">free at aistudio.google.com/apikey · stored locally and encrypted</span></label>
-        <p class="s-note" data-desktop-only>Only needed for AI answers and listening: <b>"What should I do?" works with no key at all</b>, straight from your semester. One free Gemini key covers both answers and speech-to-text. Also settable in the desktop app under Settings, Companion AI key.</p>
+        <p class="s-note" data-desktop-only>Only needed for AI answers and listening: <b>"What should I do?" works with no key at all</b>, straight from your workspace. Meta Muse 1.3 Contributor or Gemini covers both answers and speech-to-text. Also settable in the desktop app under Settings, Companion AI key.</p>
         <div class="s-field"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AQ... or AIza..." autocomplete="off" /></div>
         <div class="s-field nus-share-field"><span>Smart answers <small>Off by default. On: every reply uses the slower, stronger model.</small></span><input id="smart-mode" type="checkbox" /></div>
         <div class="s-field nus-share-field"><span>Speak replies <small>Off by default. On: answers are read aloud with the system voice.</small></span><input id="speak-replies" type="checkbox" /></div>
@@ -180,6 +182,7 @@
         <details class="s-more">
           <summary>Use a different provider</summary>
           <div class="s-seg" id="provider-seg">
+            <button data-provider="muse">Meta Muse</button>
             <button data-provider="gemini">Gemini</button>
             <button data-provider="openai">OpenAI</button>
             <button data-provider="anthropic">Anthropic</button>
@@ -195,7 +198,7 @@
 
         <details class="s-more">
           <summary>Privacy and sessions</summary>
-          <div data-desktop-only class="s-field nus-share-field"><span>Let the Knot read your semester when answering with AI <small>Off by default. On: your courses, tasks, and deadlines ride along to your chosen AI provider so answers can reference them. Off: the "What should I do?" tile still works fully on this machine.</small></span><input id="share-nus-context" type="checkbox" /></div>
+          <div data-desktop-only class="s-field nus-share-field"><span>Let Rax read your workspace context when answering with AI <small>Off by default. On: your active files, tasks, and system context ride along to your chosen AI provider so answers can reference them. Off: the "What should I do?" tile still works fully on this machine.</small></span><input id="share-nus-context" type="checkbox" /></div>
           <div data-desktop-only class="s-field nus-share-field"><span>Report answers back to the Rax desktop brain <small>Off by default. Saves finished answers to a local file the Rax desktop app reads. Stays on this machine.</small></span><input id="report-to-nus" type="checkbox" /></div>
           <div data-desktop-only class="s-field nus-share-field"><span>Save transcripts to history <small>On by default. Every capture session lands in the desktop app, searchable and uploadable to your Rax vault from the Knot section.</small></span><input id="persist-transcripts" type="checkbox" /></div>
           <div class="s-field nus-share-field"><span>Keep session audio <small>Off by default. Retains voice-activated WAV audio per session for 30 days. Audio is the storage-heavy part.</small></span><input id="save-audio" type="checkbox" /></div>

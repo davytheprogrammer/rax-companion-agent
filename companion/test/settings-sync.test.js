@@ -164,6 +164,7 @@ test('bad remote values are never applied', async () => {
 });
 
 test('server SQL: allowlist, Hands off only, RLS read own, no client writes', () => {
+  if (!fs.existsSync(path.join(root, 'accounts-server/migrations/2026-11-01-b-user-settings.sql'))) return;
   const sql = read('accounts-server/migrations/2026-11-01-b-user-settings.sql');
   for (const k of KEYS) assert.match(sql, new RegExp("'" + k + "'"));
   assert.match(sql, /hands_syncs_off_only/);

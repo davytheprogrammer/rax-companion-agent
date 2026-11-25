@@ -13,7 +13,7 @@ const { ownKeyStuck, plainAskError } = require('../src/ask-error');
 const { createFeedback, thanksText, THANKS_AT, THANKS_WEEK } = require('../src/feedback');
 
 const root = path.resolve(__dirname, '../..');
-const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 const MONEY = /\$\s?\d|\d\s?(dollars|cents)\b/i;
 
 test('the week\'s real error reports read as "the own key is stuck"; passing trouble does not', () => {
@@ -122,14 +122,14 @@ test('the thank-you: once, from the 50th ask, after the day-3 check-in and never
 
 test('the thank-you\'s words: true, plain, and the free week only as publik\'s offer with its card and charge', () => {
   const plain = thanksText(149);
-  assert.match(plain, /^You have asked Nūs 149 times on this computer\./);
+  assert.match(plain, /^You have asked (?:Nūs|Rax) 149 times on this computer\./);
   assert.match(plain, /among the people who use it the most/); assert.match(plain, /thank you\.$/);
   assert.doesNotMatch(plain, /publik|free week/);
   const week = thanksText(87, { freeWeek: true });
   assert.ok(week.endsWith(THANKS_WEEK));
   assert.match(week, /publik gives new subscribers a free week/); assert.match(week, /needs a card/); assert.match(week, /paid after the week unless you cancel/);
   for (const t of [plain, week]) { assert.doesNotMatch(t, MONEY); assert.doesNotMatch(t, /—/); assert.doesNotMatch(t, /\b(gift|reward|exclusive|just for you|only you)\b/i, 'not sold as a gift from Nūs'); }
-  assert.match(thanksText(3), /asked Nūs 50 times/, 'never a smaller number than the one that earns it');
+  assert.match(thanksText(3), /asked (?:Nūs|Rax) 50 times/, 'never a smaller number than the one that earns it');
 });
 
 test('pressing the thank-you\'s button sends fixed words, never an ask', async () => {

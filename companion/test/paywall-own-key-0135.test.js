@@ -86,7 +86,7 @@ test('the button: switched says so; otherwise Settings opens at Keys and says wh
   assert.deepEqual(run('no'), { r: 'no', said: ['PASTE'], opened: ['keys'] }, 'never a dead button');
   assert.deepEqual(run(null, { publikOwnKey: () => { throw new Error('x'); } }), { r: 'no', said: ['PASTE'], opened: ['keys'] });
   assert.match(index, /const OWN_KEY_NOW = 'Your own key answers now\. Ask again\.';/);
-  assert.match(index, /const OWN_KEY_PASTE = 'Paste a key in Settings, Keys\. A free Gemini key works\. Nūs switches to it by itself\.';/);
+  assert.match(index, /const OWN_KEY_PASTE = 'Paste a key in Settings, Keys\. A free Gemini key works\. (?:Nūs|Rax) switches to it by itself\.';/);
 });
 
 test('the app: the answers move only when publik was answering, a key for the chosen provider is saved, and the wall was met', () => {

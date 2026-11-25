@@ -2,6 +2,7 @@
 // no audio API; we transcribe with whatever audio-capable key is available, and
 // fall back across providers. Returns { text, provider } or { text:'', error }.
 const { pcmToWav } = require('./wav');
+const { transcribeMuseWav } = require('./voice/muse');
 
 async function transcribeOpenAI(apiKey, wav, model) {
   const OpenAI = require('openai');
@@ -33,8 +34,12 @@ async function transcribeGemini(apiKey, wav, model) {
 function createSTT(settings, opts = {}) {
   const keys = settings.apiKeys || {};
   const chain = [];
-  // Local whisper.cpp first: free, offline, and keyless. Cloud keys stay as
-  // fallbacks so a missing binary never silently kills listening.
+  // Meta Muse Voice Transcribe first when configured: high accuracy, turn detection, and vocabulary biasing.
+  const museKey = keys.meta || keys.muse || process.env.MODEL_API_KEY || process.env.META_API_KEY;
+  if (!opts.localOnly && museKey) {
+    chain.push({ p: 'muse', fn: (wav) => transcribeMuseWav(museKey, wav, { keywords: ['Rax', 'Knot'] }) });
+  }
+  // Local whisper.cpp: free, offline, and keyless fallback.
   let sttLocal = null;
   try { sttLocal = require('../../src/stt-local'); } catch { sttLocal = null; }
   if (sttLocal && sttLocal.status().available) {

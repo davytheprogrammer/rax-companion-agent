@@ -9,7 +9,7 @@
 // Pure, no Electron: the guide, Hands, the assignment helper and index.js all
 // call it. get-started.js keeps its own words for the key box ("paste it here").
 
-const NAMES = { publik: 'publik', gemini: 'Gemini', anthropic: 'Anthropic', openai: 'OpenAI', nvidia: 'Nvidia', cli: 'Claude Code', 'claude-code': 'Claude Code', 'claude (desktop)': 'Claude Code' };
+const NAMES = { publik: 'publik', gemini: 'Gemini', anthropic: 'Anthropic', openai: 'OpenAI', nvidia: 'Nvidia', cli: 'Claude Code', 'claude-code': 'Claude Code', 'claude (desktop)': 'Claude Code', muse: 'Meta Muse', meta: 'Meta Muse' };
 
 const NET = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed|network|getaddrinfo|socket hang up/i;
 const SIGNED_OUT = /cli_not_logged_in|not logged in|\/login|failed to authenticate|oauth|session expired/i;
@@ -20,6 +20,7 @@ function providerName(provider, text) {
   const p = String(provider || '').toLowerCase();
   if (NAMES[p]) return NAMES[p];
   if (/^cli_|claude code/i.test(text)) return 'Claude Code';
+  if (/muse|meta/i.test(text)) return 'Meta Muse';
   if (/generativelanguage|gemini/i.test(text)) return 'Gemini';
   if (/anthropic|x-api-key/i.test(text)) return 'Anthropic';
   if (/nvidia|nvapi/i.test(text)) return 'Nvidia';
@@ -70,7 +71,7 @@ function plainAskError(provider, raw) {
   if (/SAFETY|blocked|content policy|refus/i.test(text)) return Who + ' would not answer that one. Try asking another way.';
   if (/incomplete model reply|max_tokens|MAX_TOKENS/i.test(text)) return 'The answer got cut off. Ask again, or ask for less at once.';
   if (/empty reply/i.test(text)) return Who + ' sent back nothing. Ask again.';
-  return 'Something went wrong getting an answer from ' + who + '. Ask again, and if it keeps happening, tell Pranav from the Feedback button.';
+  return 'Something went wrong getting an answer from ' + who + '. Ask again, and if it keeps happening, send feedback from the Feedback button.';
 }
 
 // Pure: the person's own key or Claude Code is the reason this ask failed, and asking again will

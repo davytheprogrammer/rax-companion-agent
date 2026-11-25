@@ -31,6 +31,13 @@ public static class NusHands {
   [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsHungAppWindow(IntPtr h);
+  public static void ReleaseAllModifiers() {
+    byte[] keys = { 0x11, 0x10, 0x12, 0x5B, 0x5C };
+    foreach (byte vk in keys) {
+      keybd_event(vk, 0, 0x0002, UIntPtr.Zero);
+    }
+  }
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr h, System.Text.StringBuilder s, int n);
   public static string Title(IntPtr h) { var sb = new System.Text.StringBuilder(1024); GetWindowTextW(h, sb, 1024); return sb.ToString(); }
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -41,6 +48,10 @@ public static class NusHands {
     if (IsIconic(h)) ShowWindow(h, 9);
     keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero);
     SetForegroundWindow(h);
+    for (int i = 0; i < 10; i++) {
+      if (GetForegroundWindow() == h) return true;
+      System.Threading.Thread.Sleep(30);
+    }
     return GetForegroundWindow() == h;
   }
   [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
@@ -171,6 +182,9 @@ function Ensure-Target($req) {
   # Notepad landed in the chat window that was still in front).
   if ($req.hwnd) {
     $h = [IntPtr][int64]$req.hwnd
+    if ([NusHands]::IsWindow($h) -and [NusHands]::IsHungAppWindow($h)) {
+      return @{ ours = $false; hung = $true; error = 'the target window is frozen (not responding)'; window = [NusHands]::Title($h) }
+    }
     if ([NusHands]::IsWindow($h) -and [NusHands]::GetForegroundWindow() -ne $h) {
       [void][NusHands]::Activate($h); Start-Sleep -Milliseconds 80; $refocused = $true
     }
@@ -225,12 +239,20 @@ function Clip-Needle($s) { $q = Squash $s; if ($q.Length -gt 40) { $q = $q.Subst
 function Handle($req) {
   switch ([string]$req.op) {
     'ping' { return @{ ok=$true; pid=$PID } }
+    'keys.release_modifiers' {
+      [NusHands]::ReleaseAllModifiers()
+      return @{ ok=$true }
+    }
     'keys.chord' {
       $vks = @($req.keys | ForEach-Object { [int]$_ })
       if ($vks.Count -lt 1 -or $vks.Count -gt 4) { return @{ ok=$false; error='1 to 4 keys' } }
       foreach ($v in $vks) { if ($AllowedVk -notcontains $v) { return @{ ok=$false; error=('key not allowed: ' + $v) } } }
-      [NusHands]::Chord([int[]]$vks)
-      return @{ ok=$true }
+      try {
+        [NusHands]::Chord([int[]]$vks)
+        return @{ ok=$true }
+      } finally {
+        [NusHands]::ReleaseAllModifiers()
+      }
     }
     'win.activate' {
       # By handle, for the focus guard: the window the probe saw a moment ago.
@@ -303,12 +325,18 @@ function Handle($req) {
       if ($vks.Count -lt 1 -or $vks.Count -gt 4) { return @{ ok=$false; error='1 to 4 keys' } }
       foreach ($v in $vks) { if ($PressVk -notcontains $v) { return @{ ok=$false; error=('key not allowed: ' + $v) } } }
       $where = Ensure-Target $req
+      if ($where.hung) { return @{ ok=$false; error=$where.error; window=$where.window } }
       if ($where.ours) { return @{ ok=$false; error='the keys would have gone to Rax itself'; window=$where.window } }
-      [NusHands]::Chord([int[]]$vks)
-      return @{ ok=$true; window=$where.window; focus=$where.focus; focusType=$where.focusType; refocused=$where.refocused }
+      try {
+        [NusHands]::Chord([int[]]$vks)
+        return @{ ok=$true; window=$where.window; focus=$where.focus; focusType=$where.focusType; refocused=$where.refocused }
+      } finally {
+        [NusHands]::ReleaseAllModifiers()
+      }
     }
     'keys.text' {
       $where = Ensure-Target $req
+      if ($where.hung) { return @{ ok=$false; error=$where.error; window=$where.window } }
       if ($where.ours) { return @{ ok=$false; error='the keys would have gone to Rax itself'; window=$where.window } }
       $secret = $false
       try { $f = $AE::FocusedElement; if ($f) { $secret = [bool]$f.Current.IsPassword } } catch {}

@@ -17,7 +17,7 @@ const { createHandsExecutor, stepLine } = require('../src/tasks/executors/hands'
 const { createSurface, snapshot } = require('../src/tasks/surface');
 
 const root = path.resolve(__dirname, '..', '..');
-const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/\r\n/g, '\n');
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'nus-tasks-hands-')); }
 const tick = () => new Promise((r) => setImmediate(r));
 async function settle(n = 6) { for (let i = 0; i < n; i++) await tick(); }

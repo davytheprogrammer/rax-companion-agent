@@ -40,18 +40,41 @@ function riskyTyping({ submit, fieldName, windowTitle, nearby }) {
   return MESSAGE_FIELD.test([fieldName, windowTitle, nearby].filter(Boolean).join(' '));
 }
 
+let autonomousOverride = null;
+
+function setAutonomous(val) {
+  autonomousOverride = val;
+}
+
+function isAutonomous(ctx = {}) {
+  if (ctx && ctx.autonomous != null) return Boolean(ctx.autonomous);
+  if (autonomousOverride != null) return Boolean(autonomousOverride);
+  if (process.env.NUS_AUTONOMOUS === '1') return true;
+  try {
+    const store = require('../store');
+    const s = store.getSettings();
+    return s.handsAutonomous === true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // -> null (go ahead) or { title, detail, firm } (a card; firm = a spoken yes is not enough).
 function preview(action, ctx = {}) {
   const name = String(action && action.name || '');
   const a = (action && action.args) || {};
   const label = clip(a.label || a.text || ctx.targetName || '', 80);
-  if (name === 'window_close') return { title: 'Close ' + clip(ctx.windowTitle || 'this window', 60) + '?', detail: 'Unsaved work may be lost.', firm: false };
+  const auto = isAutonomous(ctx);
+
+  if (name === 'window_close') return auto ? null : { title: 'Close ' + clip(ctx.windowTitle || 'this window', 60) + '?', detail: 'Unsaved work may be lost.', firm: false };
   if (name === 'click') {
     const what = [label, ctx.targetName].filter(Boolean).join(' / ');
-    if (riskyLabel(what)) return { title: clip('Click "' + (ctx.targetName || label) + '"?', 80), detail: 'This looks like it ' + verbFor(what) + '.', firm: moneyWords(what) };
+    if (moneyWords(what)) return { title: clip('Click "' + (ctx.targetName || label) + '"?', 80), detail: 'This looks like it spends money.', firm: true };
+    if (!auto && riskyLabel(what)) return { title: clip('Click "' + (ctx.targetName || label) + '"?', 80), detail: 'This looks like it ' + verbFor(what) + '.', firm: false };
     return null;
   }
   if (name === 'press') {
+    if (auto) return null;
     if (riskyKeys(a.keys)) return { title: 'Press ' + clip(a.keys, 30) + '?', detail: 'That key combination sends, deletes or closes something.', firm: false };
     // Enter on its own in a message window sends what a separate type step put
     // in the box, which the type card never saw (L1).
@@ -59,17 +82,19 @@ function preview(action, ctx = {}) {
     return null;
   }
   if (name === 'type') {
+    if (auto) return null;
     if (riskyTyping({ submit: Boolean(a.submit), fieldName: ctx.fieldName, windowTitle: ctx.windowTitle, nearby: ctx.nearby })) return { title: 'Send this?', detail: clip('"' + (a.text || '') + '" will be typed and sent with Enter.', 160), firm: false };
     return null;
   }
   if (name === 'drag') {
+    if (auto) return null;
     if (/\b(trash|recycle|bin|delete)\b/i.test(String(ctx.toName || a.to_text || ''))) return { title: 'Drag to the ' + clip(ctx.toName || 'bin', 30) + '?', detail: 'That throws it away.', firm: false };
     return null;
   }
-  if (name === 'open_app' && RUNS_CODE.test(String(a.name || ''))) return { title: 'Run ' + clip(a.name, 40) + '?', detail: 'That is a program or script, not an app by name.', firm: true };
+  if (name === 'open_app' && RUNS_CODE.test(String(a.name || ''))) return auto ? null : { title: 'Run ' + clip(a.name, 40) + '?', detail: 'That is a program or script, not an app by name.', firm: true };
   // open_file on a program runs it the same way open_app would (L1): same firm card.
-  if (name === 'open_file' && RUNS_CODE.test(String(ctx.fileName || ''))) return { title: 'Run ' + clip(ctx.fileName, 40) + '?', detail: 'That is a program or script, not a document.', firm: true };
-  if (name === 'tidy') return { title: 'Tidy ' + clip(a.folder || 'the folder', 40) + '?', detail: String(ctx.plan || 'Files move into folders by type. "Undo" puts them back.'), firm: false };
+  if (name === 'open_file' && RUNS_CODE.test(String(ctx.fileName || ''))) return auto ? null : { title: 'Run ' + clip(ctx.fileName, 40) + '?', detail: 'That is a program or script, not a document.', firm: true };
+  if (name === 'tidy') return auto ? null : { title: 'Tidy ' + clip(a.folder || 'the folder', 40) + '?', detail: String(ctx.plan || 'Files move into folders by type. "Undo" puts them back.'), firm: false };
   return null;
 }
 function verbFor(text) {
@@ -118,4 +143,4 @@ function createPending({ now = () => Date.now() } = {}) {
   return { ask, answer, spoken, cancel, current, get pending() { return current(); } };
 }
 
-module.exports = { preview, riskyLabel, riskyKeys, riskyTyping, moneyWords, createPending, YES, NO, PENDING_TTL_MS };
+module.exports = { preview, riskyLabel, riskyKeys, riskyTyping, moneyWords, createPending, setAutonomous, isAutonomous, YES, NO, PENDING_TTL_MS };

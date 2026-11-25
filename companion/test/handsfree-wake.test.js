@@ -2,7 +2,7 @@
 // The wake word: what counts as being spoken to, and the armed window.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseWake, isVoiceSource, WAKE_SOURCE, ARMED_MS } = require('../src/handsfree/wake');
+const { parseWake, isEmergencyStop, isVoiceSource, WAKE_SOURCE, ARMED_MS } = require('../src/handsfree/wake');
 
 test('a line that starts with the name is a command, with the name taken off', () => {
   assert.deepEqual(parseWake('Rax, open Notepad'), { kind: 'command', text: 'open Notepad' });
@@ -103,4 +103,22 @@ test('a firm card: a spoken yes is refused, but "confirm" from the wake word ans
   const r = createPending({ now: () => 5000 });
   r.ask({ title: 'Send?', firm: true }, {}, {});
   assert.equal(r.spoken('open notepad', { heardAt: 6000, wakeConfirm: true }), 'cancelled', 'anything else still cancels');
+});
+
+test('isEmergencyStop detects fast-path abort phrases with or without wake word', () => {
+  assert.equal(isEmergencyStop('stop'), true);
+  assert.equal(isEmergencyStop('stop it!'), true);
+  assert.equal(isEmergencyStop('Rax, stop'), true);
+  assert.equal(isEmergencyStop('hey rax, cancel'), true);
+  assert.equal(isEmergencyStop('abort'), true);
+  assert.equal(isEmergencyStop('freeze!'), true);
+  assert.equal(isEmergencyStop('halt'), true);
+  assert.equal(isEmergencyStop('emergency stop'), true);
+  assert.equal(isEmergencyStop('wait stop'), true);
+  assert.equal(isEmergencyStop('pause'), true);
+  // Normal phrases containing substring 'stop' do not trigger false aborts
+  assert.equal(isEmergencyStop('stopwatch'), false);
+  assert.equal(isEmergencyStop('unstoppable'), false);
+  assert.equal(isEmergencyStop('open the bus stop map'), false);
+  assert.equal(isEmergencyStop('what is the capital of France'), false);
 });

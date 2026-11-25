@@ -20,10 +20,10 @@ const FP_W = 64, FP_H = 40;            // whole-screen fingerprint
 const GLANCE_W = 160, GLANCE_H = 100;  // "did anything change" look at a region
 const GLANCE_LEVEL = 24;               // gray levels a pixel must move to count
 const GLANCE_PIXELS = 3;               // pixels that must move (a tick is ~4, JPEG noise 0)
-const SETTLE_INTERVAL_MS = 150;
+const SETTLE_INTERVAL_MS = 60;
 const CHANGE_THRESHOLD = 4.0;          // mean gray change vs the baseline = "something happened"
 const STILL_THRESHOLD = 1.5;           // mean gray change between consecutive frames = "still"
-const SETTLE_AFTER_CLICK_MS = 1500;    // longest wait for a click to show, then we look anyway
+const SETTLE_AFTER_CLICK_MS = 1000;    // longest wait for a click to show, then we look anyway
 
 // Box-average downsample of a BGRA bitmap to a gray thumbnail of tw x th.
 // rect (optional, in bitmap pixels) crops first.

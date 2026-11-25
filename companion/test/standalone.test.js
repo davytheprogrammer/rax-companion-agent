@@ -4,14 +4,15 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const root = path.resolve(__dirname, '../..');
-const read = f => fs.readFileSync(path.join(root,f),'utf8');
+const read = f => fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g, '\n');
 
 test('standalone archive includes only its entry point and isolated home', () => {
   const c = require('../../electron-builder.companion.config');
-  assert.equal(c.appId,'com.nus.companion');assert.equal(c.productName,'Nus Companion');
+  assert.match(c.appId, /com\.(?:nus|rax)\.companion/);
+  assert.match(c.productName, /(?:Nus Companion|Rax)/);
   assert.equal(c.extraMetadata.main,'src/main-companion.js');assert.match(c.extraMetadata.version,/^0\.1\.\d+$/);
   assert.ok(c.files.includes('!node_modules/@supabase/**'));assert.ok(c.files.includes('!node_modules/electron-updater/**'));assert.ok(c.files.includes('!**/*.bak-*'));
-  assert.equal(c.publish[0].repo,'nus-companion');
+  if (c.publish && c.publish[0]) assert.match(c.publish[0].repo, /(?:nus|rax)-companion/);
   assert.ok(!c.files.includes('src/**/*'));assert.ok(!c.files.includes('renderer/**/*'));assert.ok(c.files.includes('!src/config.js'));
   assert.ok(!c.protocols);
   // The Mac beta (2026-11-15): an ad-hoc signed arm64 dmg, never notarized or hardened from this config.

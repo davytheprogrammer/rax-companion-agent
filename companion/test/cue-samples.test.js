@@ -101,7 +101,7 @@ test('cues.js plays the six as buffers through their own gain, never over the mi
 });
 
 test('the renderer puts each cue at its moment', () => {
-  const r = fs.readFileSync(path.join(dir, 'renderer.js'), 'utf8');
+  const r = fs.readFileSync(path.join(dir, 'renderer.js'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(r, /if \(pttHeld\) cues\.play\('press', \{ force: true \}\);/, 'press as the mic opens, after quiet()');
   assert.ok(r.indexOf("cues.quiet();\n    if (pttHeld) cues.play('press'") > 0, 'quiet first, then the pop');
   assert.match(r, /ack\(\{ silent: true \}\);\s*cues\.play\('release'\);/, 'release at key up, the ack motif silent there');

@@ -54,7 +54,7 @@
       y += 96;
     }
     g.fillStyle = MIST; g.font = "500 24px 'JetBrains Mono', monospace";
-    spaced('RAX · POTLAKAI.GITHUB.IO/NUS', pad, H - 80, 5);
+    spaced('RAX · COMPANION', pad, H - 80, 5);
     return c;
   }
   window.NusShare = { draw, W, H };
