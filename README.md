@@ -1,13 +1,13 @@
-# Rax
+# RaxDesk
 
-Ask about your screen by voice or text. The Knot points, guides and can act.
+RaxDesk is your desktop companion. Ask Rax about your screen by voice or text; Rax can point, guide and act.
 
 ![The first run: Rax opens Notepad and types a hello, then the Knot says hi from the corner of the screen](https://raw.githubusercontent.com/potlakai/nus-companion/main/docs/first-run.png)
 
 The first time you start it, Rax opens Notepad, types this, and the Knot says
 hello from the corner of your screen.
 
-Rax is a Windows app (Electron). The Knot sits on your screen.
+RaxDesk is a desktop app (Electron). Rax, your assistant, sits on your screen as the Knot.
 Hold Ctrl+Alt and ask about what you see, and it answers, points at the right
 place, walks you through it step by step, or does it for you with Hands.
 

@@ -21,7 +21,7 @@ function dataDirFromArgv(argv = process.argv) {
   // installer's restart does not pass our environment on). scripts/update-test.
   return testBuild.dataDir || null;
 }
-app.setName('Rax');
+app.setName('RaxDesk');
 const dir = dataDirFromArgv();
 const defaultDir = path.join(app.getPath('appData'), 'Rax Companion');
 const legacyDir = path.join(app.getPath('appData'), 'Nus Companion');
@@ -232,7 +232,7 @@ function lifestyleSnapshot() {
 }
 function openHome() {
   if (home && !home.isDestroyed()) { if (home.isMinimized()) home.restore(); home.show(); home.focus(); return home; }
-  home = new BrowserWindow({ width: 1100, height: 720, minWidth: 800, minHeight: 560, backgroundColor: '#0b0d12', title: 'Rax Dashboard',
+  home = new BrowserWindow({ width: 1100, height: 720, minWidth: 800, minHeight: 560, backgroundColor: '#0b0d12', title: 'RaxDesk Dashboard',
     webPreferences: { preload: path.join(__dirname, '..', 'companion', 'home', 'preload.js'), sandbox: true, contextIsolation: true, nodeIntegration: false } });
   home.setMenuBarVisibility(false);
   // The Companion window follows the same "hidden from screen sharing" switch

@@ -9,7 +9,9 @@ const read = f => fs.readFileSync(path.join(root,f),'utf8').replace(/\r\n/g, '\n
 test('standalone archive includes only its entry point and isolated home', () => {
   const c = require('../../electron-builder.companion.config');
   assert.match(c.appId, /com\.(?:nus|rax)\.companion/);
-  assert.match(c.productName, /(?:Nus Companion|Rax)/);
+  assert.equal(c.productName, 'RaxDesk');
+  assert.equal(c.nsis.shortcutName, 'RaxDesk');
+  assert.equal(c.nsis.uninstallDisplayName, 'RaxDesk');
   assert.equal(c.extraMetadata.main,'src/main-companion.js');assert.match(c.extraMetadata.version,/^0\.1\.\d+$/);
   assert.ok(c.files.includes('!node_modules/@supabase/**'));assert.ok(c.files.includes('!node_modules/electron-updater/**'));assert.ok(c.files.includes('!**/*.bak-*'));
   if (c.publish && c.publish[0]) assert.match(c.publish[0].repo, /(?:nus|rax)-companion/);

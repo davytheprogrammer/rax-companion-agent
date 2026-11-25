@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
-  <title>Rax Dashboard</title>
+  <title>RaxDesk Dashboard</title>
   <link rel="stylesheet" href="home.css" />
   <link rel="stylesheet" href="now.css" />
   <link rel="stylesheet" href="mynus.css" />
 </head>
 <body>
   <aside class="rail">
-    <canvas id="brand-knot" class="brand-mark" aria-hidden="true"></canvas><h1>RAX</h1><small class="version">Version <span id="app-version"></span></small>
+    <canvas id="brand-knot" class="brand-mark" aria-hidden="true"></canvas><h1>RaxDesk</h1><small class="version">Version <span id="app-version"></span></small>
     <nav aria-label="Main navigation">
       <button data-view="start" id="nav-start" class="active" aria-current="page">Dashboard</button>
       <button data-view="mynus" id="nav-mynus">My Rax</button>
@@ -28,7 +28,7 @@
     <p id="notice" role="status" aria-live="polite"></p>
     <p id="toast" role="status" aria-live="polite" hidden></p>
     <section id="update-card" class="glass card" aria-label="New version" hidden>
-      <div class="stats-line"><p><strong id="update-title">A newer Rax is out.</strong> <span class="muted" id="update-copy"></span></p><span class="row-actions"><button id="update-download" class="primary">Download</button><button id="update-later" class="quiet">Later</button></span></div>
+      <div class="stats-line"><p><strong id="update-title">A newer RaxDesk is out.</strong> <span class="muted" id="update-copy"></span></p><span class="row-actions"><button id="update-download" class="primary">Download</button><button id="update-later" class="quiet">Later</button></span></div>
     </section>
     <section id="contact-card" class="glass card" aria-label="News from Rax" hidden>
       <form id="contact-form" class="stats-line" novalidate><p><strong id="contact-title"></strong> <span class="muted" id="contact-copy"></span></p><span class="row-actions"><input id="contact-email" type="email" maxlength="200" autocomplete="email" aria-label="Your email"><button id="contact-save" type="submit" class="primary"></button><button id="contact-no" type="button" class="quiet"></button></span></form>
@@ -36,7 +36,7 @@
     </section>
     <section id="stats-intro" class="glass card" aria-label="Anonymous usage stats" hidden>
       <div class="stats-line"><p class="muted">Rax sends anonymous usage stats (which features get used, never your private files or what you type). Turn off in Settings.</p><label class="check switch"><input id="send-stats-intro" type="checkbox">Send anonymous usage stats</label></div>
-      <div class="stats-source"><span>Where did you hear about Rax?</span><div class="source-row"><button data-source="instagram">Instagram</button><button data-source="friend">A friend</button><button data-source="reddit">Reddit</button><button data-source="x">X</button><button data-source="youtube">YouTube</button><button data-source="search">Search</button><button data-source="other">Other</button><button data-source="skipped" class="quiet">Skip</button></div></div>
+      <div class="stats-source"><span>Where did you hear about RaxDesk?</span><div class="source-row"><button data-source="instagram">Instagram</button><button data-source="friend">A friend</button><button data-source="reddit">Reddit</button><button data-source="x">X</button><button data-source="youtube">YouTube</button><button data-source="search">Search</button><button data-source="other">Other</button><button data-source="skipped" class="quiet">Skip</button></div></div>
     </section>
     <section id="view-map" class="view active" aria-label="Map">
       <div class="view-intro"><p>Your folders, routines, and conversations, connected.<br><span class="muted">Drag to arrange. Scroll to zoom. Select a node to open it.</span></p><div class="map-tools"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="map-fit">Fit</button></div></div>

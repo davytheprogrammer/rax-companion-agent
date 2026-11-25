@@ -1,7 +1,7 @@
 {
   "name": "nus-companion",
   "version": "0.1.35",
-  "description": "Rax: ask about your screen by voice or text. The Knot points, guides and can act.",
+  "description": "RaxDesk: ask Rax about your screen by voice or text. Rax points, guides and can act.",
   "main": "src/main-companion.js",
   "private": true,
   "scripts": {

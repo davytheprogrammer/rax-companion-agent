@@ -110,7 +110,7 @@
     if (!show) return;
     updateUrl = u.available.url || null;
     updateOneClick = !!u.oneClick;
-    $('#update-title').textContent = 'Rax ' + u.available.version + ' is out (this is ' + u.current + ').';
+    $('#update-title').textContent = 'RaxDesk ' + u.available.version + ' is out (this is ' + u.current + ').';
     $('#update-download').textContent = updateOneClick ? 'Update' : 'Download';
     const busy = u.progress && (u.progress.phase === 'downloading' || u.progress.phase === 'installing');
     $('#update-download').disabled = !!busy;

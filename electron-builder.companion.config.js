@@ -12,10 +12,10 @@ const ONNX_KEEP = MAC
     '!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/DirectML.dll', '!node_modules/onnxruntime-node/bin/napi-v*/win32/x64/dx*.dll'];
 module.exports = {
   appId: 'com.rax.companion',
-  productName: 'Rax',
+  productName: 'RaxDesk',
   copyright: base.copyright,
   extraMetadata: { name: 'rax-companion', version: '0.1.35', main: 'src/main-companion.js', publik: PUBLIK,
-    description: 'Rax: the Knot that hears you and acts, on its own.' },
+    description: 'RaxDesk: your desktop companion, powered by Rax.' },
   directories: { output: 'dist-companion', buildResources: 'build' },
   // companion/** carries companion/src/stats.js (anonymous usage stats, plain
   // fetch, no SDK); @supabase and electron-updater stay out of this build.
@@ -89,6 +89,6 @@ module.exports = {
       { from: 'vendor/embed-models', to: 'embed-models', filter: ['all-MiniLM-L6-v2/model_quantized.onnx', 'all-MiniLM-L6-v2/vocab.txt'] }],
   },
   portable: { artifactName: 'Rax-Companion-Portable.${ext}' },
-  nsis: { ...base.nsis, shortcutName: 'Rax', uninstallDisplayName: 'Rax', perMachine: true, allowElevation: true },
+  nsis: { ...base.nsis, shortcutName: 'RaxDesk', uninstallDisplayName: 'RaxDesk', perMachine: true, allowElevation: true },
   publish: null,
 };
